@@ -22,3 +22,20 @@ export interface NodeSnapshot {
   inputs: PortSnapshot[]
   outputs: PortSnapshot[]
 }
+
+/** 框选提示框，单位为画布内 CSS 像素（屏幕空间，不随缩放变化） */
+export interface SelectionRect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+export interface LinkSnapshot {
+  id: number
+  originId: number
+  originSlot: number
+  targetId: number
+  targetSlot: number
+  type: string
+}

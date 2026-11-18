@@ -1,9 +1,12 @@
-import { useGraphStore } from './store'
+import { useMemo } from 'react'
+import { useGraphStore } from '../graph/store'
 import { NodeView } from './NodeView'
 
 export function NodeOverlay() {
   const nodes = useGraphStore((s) => s.nodes)
   const viewport = useGraphStore((s) => s.viewport)
+  const selectedIds = useGraphStore((s) => s.selectedIds)
+  const selected = useMemo(() => new Set(selectedIds), [selectedIds])
 
   return (
     <div
@@ -17,7 +20,7 @@ export function NodeOverlay() {
       }}
     >
       {nodes.map((node) => (
-        <NodeView key={node.id} node={node} />
+        <NodeView key={node.id} node={node} selected={selected.has(node.id)} />
       ))}
     </div>
   )

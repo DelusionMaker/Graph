@@ -1,15 +1,16 @@
 import { memo } from 'react'
-import { GEOMETRY } from './geometry'
-import type { NodeSnapshot } from './types'
+import { GEOMETRY } from '../graph/geometry'
+import type { NodeSnapshot } from '../graph/types'
 
 interface Props {
   node: NodeSnapshot
+  selected: boolean
 }
 
-export const NodeView = memo(function NodeView({ node }: Props) {
+export const NodeView = memo(function NodeView({ node, selected }: Props) {
   return (
     <div
-      className="spike-node"
+      className={`graph-node${selected ? ' is-selected' : ''}`}
       data-node-id={node.id}
       style={{
         left: node.pos[0],
@@ -18,9 +19,9 @@ export const NodeView = memo(function NodeView({ node }: Props) {
         height: node.size[1],
       }}
     >
-      <div className="spike-node-title" style={{ height: GEOMETRY.titleHeight }}>
+      <div className="graph-node-title" style={{ height: GEOMETRY.titleHeight }}>
         {node.title}
-        <span className="spike-node-id">#{node.id}</span>
+        <span className="graph-node-id">#{node.id}</span>
       </div>
 
       {node.inputs.map((port) => {
@@ -28,14 +29,14 @@ export const NodeView = memo(function NodeView({ node }: Props) {
         return (
           <div key={`in-${port.index}`}>
             <span
-              className={`spike-port${port.connected ? ' is-connected' : ''}`}
+              className={`graph-port${port.connected ? ' is-connected' : ''}`}
               data-node-id={node.id}
               data-port-index={port.index}
               data-direction="in"
               style={{ left: cx - GEOMETRY.slotRadius, top: cy - GEOMETRY.slotRadius }}
               title={`${port.name} (${port.type})`}
             />
-            <span className="spike-port-label" style={{ left: cx + 12, top: cy - 9 }}>
+            <span className="graph-port-label" style={{ left: cx + 12, top: cy - 9 }}>
               {port.name}
             </span>
           </div>
@@ -47,14 +48,14 @@ export const NodeView = memo(function NodeView({ node }: Props) {
         return (
           <div key={`out-${port.index}`}>
             <span
-              className={`spike-port${port.connected ? ' is-connected' : ''}`}
+              className={`graph-port${port.connected ? ' is-connected' : ''}`}
               data-node-id={node.id}
               data-port-index={port.index}
               data-direction="out"
               style={{ left: cx - GEOMETRY.slotRadius, top: cy - GEOMETRY.slotRadius }}
               title={`${port.name} (${port.type})`}
             />
-            <span className="spike-port-label is-output" style={{ right: node.size[0] - cx + 12, top: cy - 9 }}>
+            <span className="graph-port-label is-output" style={{ right: node.size[0] - cx + 12, top: cy - 9 }}>
               {port.name}
             </span>
           </div>

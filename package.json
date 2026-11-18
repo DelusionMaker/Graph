@@ -1,5 +1,5 @@
 {
-  "name": "react-litegraph-spike",
+  "name": "react-litegraph-editor",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "verify:spike": "node scripts/verify-spike.mjs"
+    "verify:canvas": "node scripts/verify-canvas.mjs"
   },
   "dependencies": {
     "@comfyorg/litegraph": "0.17.2",

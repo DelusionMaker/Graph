@@ -1,23 +1,15 @@
-import { LiteGraphCanvas } from './spike/LiteGraphCanvas'
-import { NodeOverlay } from './spike/NodeOverlay'
-import { SpikePanel } from './spike/SpikePanel'
+import { GraphCanvas } from './components/GraphCanvas'
+import { StatusBar } from './components/StatusBar'
 
 export default function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <strong>React + LiteGraph Spike</strong>
-        <span>阶段 0 · 共存可行性验证</span>
+        <strong>React + LiteGraph</strong>
+        <span>阶段 1 · 画布基座</span>
       </header>
-      <div className="app-body">
-        <aside className="spike-panel">
-          <SpikePanel />
-        </aside>
-        <main className="canvas-area">
-          <LiteGraphCanvas />
-          <NodeOverlay />
-        </main>
-      </div>
+      <GraphCanvas />
+      <StatusBar />
     </div>
   )
 }
