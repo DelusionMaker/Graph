@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "verify:canvas": "node scripts/verify-canvas.mjs",
     "verify:acceptance": "node scripts/verify-acceptance.mjs",
+    "verify:3d": "node scripts/verify-3d.mjs",
     "test": "vitest run"
   },
   "dependencies": {

@@ -65,9 +65,11 @@ export function PostFXStack() {
   const effects = chain
     .map(renderEffect)
     .filter((element): element is ReactElement => element !== null)
+  // SSAO 依赖 NormalPass，未开启时组件会直接报错并返回空 effect
+  const needsNormalPass = chain.some((item) => item.type === 'SSAO')
 
   return (
-    <EffectComposer key={chainHash} multisampling={0}>
+    <EffectComposer key={chainHash} multisampling={0} enableNormalPass={needsNormalPass}>
       {effects}
     </EffectComposer>
   )

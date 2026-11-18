@@ -7,6 +7,7 @@ import {
 } from 'react'
 import { useGraphActions } from '../graph/actions'
 import { useGraphStore } from '../graph/store'
+import { useToastStore } from '../graph/toastStore'
 import { createModelUrl, registerAsset } from '../viewer/assets'
 import { useViewerStore } from '../viewer/useViewerStore'
 import { Viewport3D } from '../viewer/Viewport3D'
@@ -19,6 +20,19 @@ const PRIMITIVE_LABELS: Record<(typeof PRIMITIVES)[number], string> = {
   box: 'Box',
   sphere: 'Sphere',
   torusknot: 'Knot',
+}
+
+/**
+ * 上传前校验文件头：
+ * - GLB：magic 为 'glTF'；
+ * - glTF：JSON 文本以 '{' 开头。
+ * 拦截明显无效的文件，避免进入 loader 后产生未处理 rejection。
+ */
+async function looksLikeGltf(file: File): Promise<boolean> {
+  const head = new Uint8Array(await file.slice(0, 4).arrayBuffer())
+  if (head[0] === 0x67 && head[1] === 0x6c && head[2] === 0x54 && head[3] === 0x46) return true
+  const text = await file.slice(0, 64).text()
+  return text.trimStart().startsWith('{')
 }
 
 /** 左栏：上半 3D 视口 + 下半节点库，中间可拖拽分隔条 */
@@ -56,10 +70,24 @@ export function ViewerDock({ children }: { children: ReactNode }) {
     window.addEventListener('pointerup', stop)
   }
 
-  const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleShape = (value: (typeof PRIMITIVES)[number]) => {
+    setShape(value)
+    // 有 scene/Mesh 时节点是唯一来源，工具条也要写回节点，否则点击不生效
+    const meshNode = nodes.find((node) => node.type === 'scene/Mesh')
+    if (!meshNode) return
+    const shapeIndex = meshNode.widgets.findIndex((widget) => widget.name === 'shape')
+    if (shapeIndex >= 0) setWidgetValue(meshNode.id, shapeIndex, value)
+  }
+
+  const handleFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
+
+    if (!(await looksLikeGltf(file))) {
+      useToastStore.getState().show('文件不是有效的 glTF / GLB', 'error')
+      return
+    }
 
     const url = createModelUrl(file)
     const assetId = `gltf-${Date.now()}`
@@ -93,7 +121,7 @@ export function ViewerDock({ children }: { children: ReactNode }) {
                 key={value}
                 type="button"
                 className={shape === value ? 'is-active' : ''}
-                onClick={() => setShape(value)}
+                onClick={() => handleShape(value)}
               >
                 {PRIMITIVE_LABELS[value]}
               </button>

@@ -222,7 +222,8 @@ export function parseWorkflow(raw: unknown): ParseResult {
   }
 
   const rawConfig = isRecord(raw.config) ? raw.config : {}
-  const rawVersion = Number(rawConfig.schema_version ?? SCHEMA_VERSION)
+  // 未写版本号的旧文档按 v1 处理，确保能补上 shader_extension
+  const rawVersion = Number(rawConfig.schema_version ?? 1)
   if (!Number.isInteger(rawVersion) || rawVersion < 1) {
     return { workflow: null, issues: [{ level: 1, message: `非法的 schema_version：${rawConfig.schema_version}` }] }
   }
