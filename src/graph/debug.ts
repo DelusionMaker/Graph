@@ -10,6 +10,7 @@ import {
 } from './measure'
 import { writePersistedWorkflow } from './persistence'
 import { graphToWorkflow } from './serialize'
+import { useProgramStore } from '../shader/useProgramStore'
 import { toPromptAPI, type ImportIssue, type PromptAPI, type WorkflowUI } from './workflow'
 
 /**
@@ -32,7 +33,20 @@ export interface GraphDebugApi {
   historyState: () => { canUndo: boolean; canRedo: boolean }
   /** 立即写入 localStorage，跳过 1s 防抖（仅测试使用） */
   saveNow: () => void
+  /** 当前编译产物快照（阶段 C / D 的 E2E 断言入口） */
+  programState: () => {
+    status: string
+    hash: string
+    shading: 'pbr' | 'unlit' | null
+    mesh: WorkflowProgramSnapshot['mesh'] | null
+    postfx: string[]
+    warnings: string[]
+    errors: Array<{ nodeId?: number; message: string }>
+    uniforms: Record<string, { type: string; value: unknown }>
+  }
 }
+
+type WorkflowProgramSnapshot = NonNullable<ReturnType<typeof useProgramStore.getState>['program']>
 
 declare global {
   interface Window {
@@ -64,6 +78,19 @@ export function attachDebugApi(graph: LGraph, canvas: LGraphCanvas): () => void 
       return { canUndo: state.canUndo, canRedo: state.canRedo }
     },
     saveNow: () => writePersistedWorkflow(graphToWorkflow(graph)),
+    programState: () => {
+      const state = useProgramStore.getState()
+      return {
+        status: state.status,
+        hash: state.programHash,
+        shading: state.program?.shading ?? null,
+        mesh: state.program?.mesh ?? null,
+        postfx: state.program?.postfxChain.map((item) => item.type) ?? [],
+        warnings: state.program?.warnings ?? [],
+        errors: state.errors,
+        uniforms: state.program?.uniforms ?? {},
+      }
+    },
   }
 
   window.__graphDebug = api

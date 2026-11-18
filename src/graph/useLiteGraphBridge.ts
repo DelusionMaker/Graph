@@ -9,6 +9,7 @@ import { getNodeDefinition, registerNodeDefinitions } from './nodeRegistry'
 import { readPersistedWorkflow, writePersistedWorkflow } from './persistence'
 import { seedDemoGraph } from './seed'
 import { applyWorkflow, graphToWorkflow } from './serialize'
+import { cancelProgramCompile, invalidateProgram } from '../shader/invalidateProgram'
 import { useGraphStore } from './store'
 import { useToastStore } from './toastStore'
 import { installTypeSystem } from './typeSystem'
@@ -225,6 +226,8 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
       if (suspendHistory) return
       if (history.push(snapshotGraph(), options)) queueAutosave()
       syncHistoryFlags()
+      // 数据失效 → 120ms 防抖编译；签名不变时只刷新 uniform
+      invalidateProgram()
     }
 
     const rebuild = (workflow: WorkflowUI) => {
@@ -245,6 +248,8 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
       if (!workflow) return
       rebuild(workflow)
       queueAutosave()
+      // rebuild 期间 commit 被 suspendHistory 挡住，这里补一次编译
+      invalidateProgram({ immediate: true })
     }
     const undo = () => {
       const snapshot = history.undo()
@@ -595,6 +600,8 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
     syncViewport()
     history.reset(snapshotGraph())
     syncHistoryFlags()
+    // 首次编译：视口挂载时立刻有可用产物（空图时得到默认 Box + 白材质）
+    invalidateProgram({ immediate: true })
     setContext({ graph, canvas, addNode })
 
     return () => {
@@ -609,6 +616,7 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
       cancelAnimationFrame(syncFrame)
       cancelAnimationFrame(positionFrame)
       window.clearTimeout(autosaveTimer)
+      cancelProgramCompile()
       clearLinkSelection()
       resetGraphActions()
 

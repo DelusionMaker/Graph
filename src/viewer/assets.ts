@@ -1,7 +1,13 @@
-import type { Material, Mesh, Object3D, Texture } from 'three'
+import { DataTexture, type Material, type Mesh, type Object3D, type Texture } from 'three'
 
 /** 本模块创建、需要显式回收的 blob URL */
 const modelUrls = new Set<string>()
+/** assetId → blob URL（scene/Mesh 的 assetId 通过这里解析） */
+const assetUrls = new Map<string, string>()
+/** assetId → 纹理（shader/Texture 通过这里解析） */
+const textures = new Map<string, Texture>()
+
+let fallbackTexture: DataTexture | null = null
 
 /** 为一个 glTF 文件创建受管理的 blob URL */
 export function createModelUrl(file: File): string {
@@ -15,6 +21,48 @@ export function revokeModelUrl(url: string | null): void {
   if (!url || !modelUrls.has(url)) return
   URL.revokeObjectURL(url)
   modelUrls.delete(url)
+}
+
+/** 把 assetId 绑定到模型 URL（scene/Mesh 的 assetId 使用） */
+export function registerAsset(id: string, url: string): void {
+  assetUrls.set(id, url)
+}
+
+export function resolveAsset(id: string): string | null {
+  return assetUrls.get(id) ?? null
+}
+
+/** 解析模型地址：先查 assetId 映射，再允许直接传 blob URL */
+export function resolveModelUrl(assetId: string): string | null {
+  if (!assetId) return null
+  const mapped = resolveAsset(assetId)
+  if (mapped) return mapped
+  return assetId.startsWith('blob:') ? assetId : null
+}
+
+export function revokeAsset(id: string): void {
+  const url = assetUrls.get(id)
+  if (!url) return
+  revokeModelUrl(url)
+  assetUrls.delete(id)
+}
+
+/** 注册纹理资源（后续纹理上传 UI 使用） */
+export function registerTexture(id: string, texture: Texture): void {
+  const previous = textures.get(id)
+  if (previous && previous !== texture) previous.dispose()
+  textures.set(id, texture)
+}
+
+/** 纹理未加载时回退到 1×1 白色贴图，不阻断渲染 */
+export function resolveTexture(id: string): Texture {
+  const hit = textures.get(id)
+  if (hit) return hit
+  if (!fallbackTexture) {
+    fallbackTexture = new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1)
+    fallbackTexture.needsUpdate = true
+  }
+  return fallbackTexture
 }
 
 /** 递归释放 Object3D 的几何体、材质与贴图 */

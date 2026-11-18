@@ -5,7 +5,9 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
-import { createModelUrl } from '../viewer/assets'
+import { useGraphActions } from '../graph/actions'
+import { useGraphStore } from '../graph/store'
+import { createModelUrl, registerAsset } from '../viewer/assets'
 import { useViewerStore } from '../viewer/useViewerStore'
 import { Viewport3D } from '../viewer/Viewport3D'
 
@@ -30,6 +32,8 @@ export function ViewerDock({ children }: { children: ReactNode }) {
   const perfMode = useViewerStore((state) => state.perfMode)
   const setPerfMode = useViewerStore((state) => state.setPerfMode)
   const dockOpen = useViewerStore((state) => state.dockOpen)
+  const nodes = useGraphStore((state) => state.nodes)
+  const setWidgetValue = useGraphActions((state) => state.setWidgetValue)
   const dockRef = useRef<HTMLElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -56,7 +60,20 @@ export function ViewerDock({ children }: { children: ReactNode }) {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
-    setGltf(createModelUrl(file), file.name)
+
+    const url = createModelUrl(file)
+    const assetId = `gltf-${Date.now()}`
+    registerAsset(assetId, url)
+    // 无 Mesh 节点时作为视口兜底
+    setGltf(url, file.name)
+
+    // 有 scene/Mesh 节点时，把模型写入节点，让节点图成为唯一来源
+    const meshNode = nodes.find((node) => node.type === 'scene/Mesh')
+    if (!meshNode) return
+    const assetIndex = meshNode.widgets.findIndex((widget) => widget.name === 'assetId')
+    const shapeIndex = meshNode.widgets.findIndex((widget) => widget.name === 'shape')
+    if (assetIndex >= 0) setWidgetValue(meshNode.id, assetIndex, assetId)
+    if (shapeIndex >= 0) setWidgetValue(meshNode.id, shapeIndex, 'gltf')
   }
 
   return (
