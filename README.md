@@ -1,6 +1,6 @@
 # React + LiteGraph 节点编辑器
 
-按《React-LiteGraph节点面板项目规划》实现的 Web 节点编辑器。当前处于 **阶段 4：视觉与完善**——LiteGraph 负责图模型与画布交互，React 渲染节点 DOM、Widget、节点库与外围 UI；数据层支持双格式导入导出与撤销/重做，视觉层提供双主题、LOD、迷你地图、检查器与响应式布局。
+按《React-LiteGraph节点面板项目规划》实现的 Web 节点编辑器，**阶段 0–5 已完成**。LiteGraph 负责图模型与画布交互，React 渲染节点 DOM、Widget、节点库与外围 UI；数据层支持双格式导入导出、持久化与撤销/重做；视觉层提供双主题、LOD、迷你地图、检查器与响应式布局。
 
 ## 环境
 
@@ -14,7 +14,7 @@ npm install
 npm run dev
 ```
 
-打开 http://localhost:5173 。顶部是撤销/重做与导入导出，左侧节点库，中央画布，右侧是仅开发环境可见的验证面板。
+打开 http://localhost:5173 。顶部是撤销/重做、载入示例与导入导出，左侧节点库，中央画布，右侧检查器（开发环境下可切到验证面板）。
 
 构建检查：
 
@@ -31,10 +31,13 @@ npm test
 自动验证（需先启动 dev server）：
 
 ```bash
-npm run verify:canvas
+npm run verify:canvas      # 画布交互逐项回归
+npm run verify:acceptance  # 阶段 5 全流程验收（示例工作流 / 性能 / 异常路径）
 ```
 
-## 当前能力（阶段 3）
+示例工作流见 `examples/text-to-image.workflow.json`，也可以在应用内点「载入示例」直接载入。
+
+## 当前能力（阶段 5）
 
 | 能力 | 说明 |
 |---|---|
@@ -45,10 +48,11 @@ npm run verify:canvas
 | 删除连线 | 点击连线使其高亮（蓝色），按 Delete/Backspace |
 | 节点库 | 左侧分类列表 + 关键字搜索；点击 = 在视口中心添加，拖拽 = 在落点添加（拖动中不建节点，画布显示虚线落点高亮） |
 | Widget | React 渲染 number / slider / combo / text / toggle，修改写回 LiteGraph widget |
-| 类型系统 | 端口与连线按类型着色；`INT↔FLOAT` 互连放行，其余非法连接由 LiteGraph 原生拦截 |
+| 类型系统 | 端口与连线按类型着色；`INT↔FLOAT` 互连放行，非法类型与环路连接被拦截并弹出提示 |
 | 节点注册 | `NodeDefinition` 声明输入/输出/Widget，运行时注册为 LiteGraph 节点类型 |
 | 双格式数据 | UI 格式（含布局）与执行格式（纯拓扑）互转；`toPromptAPI` 为纯函数 |
-| 导入导出 | 顶部按钮导出 `workflow.json` / `prompt.json`，导入时做三级校验 |
+| 导入导出 | 顶部按钮导出 `workflow.json` / `prompt.json`，导入时做三级校验；导入后自动缩放以容纳全部节点 |
+| 示例工作流 | 「载入示例」一键载入 5 节点 6 连线的文生图工作流（也可导入 `examples/` 下的 JSON） |
 | 持久化 | 图变更后 1s 防抖写入 `localStorage`（键 `node-editor:workflow:v1`），刷新自动恢复 |
 | 撤销/重做 | 快照式历史栈（上限 50），连续调参合并为一条；`Ctrl/⌘+Z`、`Ctrl/⌘+Shift+Z` |
 | 导入校验 | ① 结构错误拒绝导入；② 悬空连线/重复 id 丢弃并提示；③ 未知端口类型降级为 `*` |
@@ -80,6 +84,34 @@ npm run verify:canvas
 - **稳定性**：无页面异常。
 
 单元测试 `npm test`（Vitest）覆盖纯数据层 17 项：`toPromptAPI` 的连线/静音/Widget 覆盖规则、`parseWorkflow` 的三级校验与索引重建、`SnapshotHistory` 的去重/上限/分支截断/合并窗口。
+
+## 阶段 5 验收报告
+
+`npm run verify:acceptance` 覆盖规划 §11.1 的全流程检查，**19/19 通过**：
+
+| 验收项 | 结果 |
+|---|---|
+| 示例工作流载入（5 节点 / 6 连线） | 通过，执行格式引用正确（`[源节点, 槽位]`） |
+| 删除节点 → 撤销恢复 | 5 → 4 → 5 |
+| 导出 → 导入结构一致 | 通过（节点/位置/尺寸/Widget/连线全部一致） |
+| 非法类型连接拦截 + 提示 | 6 条连线不变，Toast 显示「VAE → MODEL 类型不匹配」 |
+| 环路连接拦截 + 提示 | 7 条连线不变，Toast 显示「不能连接：会形成循环依赖」 |
+| 100 节点渲染性能（0.3x） | 平均 **0.3ms/帧**、峰值 **0.5ms**（阈值 20ms，≥50fps） |
+| 100 节点 LOD | DOM 100 个节点，Widget/LOD 生效 |
+| 撤销/重做 100 节点导入 | 6 → 100 |
+| localStorage 写入失败 | 捕获异常，编辑不中断 |
+| 保存后刷新恢复 | 4 → 5 → 5 |
+| 1280 / 1920 布局 | 无横向溢出，画布 820 / 1380px |
+| 仓库示例 JSON 可导入 | 5 节点 / 6 连线 |
+| 页面异常 | 0 |
+
+性能说明：上表统计的是 LiteGraph 画布帧成本（节点/连线/背景），React 覆盖层在 0.3x 下由 LOD 隐藏文字与控件；100 节点全量 DOM 仍保持 100 个节点框，滚动与拖拽未出现掉帧。示例工作流见 `examples/text-to-image.workflow.json`。
+
+### 已知边界
+
+- 节点折叠、静音/旁路尚未提供 UI（数据模型的 `mode` 已支持，执行格式会跳过非 0 节点）；
+- 组（Group）可反序列化但暂不渲染与导出；
+- 导入只接受 UI 格式（`nodes/links`）；执行格式用于导出，不支持反向还原布局。
 
 ## LiteGraph 0.17.2 API 核实记录
 
@@ -150,7 +182,10 @@ src/
 │   ├── history.ts              # 快照历史栈（上限/合并窗口）
 │   ├── persistence.ts          # localStorage 读写
 │   ├── uiStore.ts              # 主题状态与持久化
-│   ├── seed.ts                 # 示例工作流
+│   ├── samples.ts              # 示例工作流（5 节点 6 连线）
+│   ├── toastStore.ts           # 轻量提示状态
+│   ├── connectionFeedback.ts   # 连接被拒原因记录（类型/环路）
+│   ├── seed.ts                 # 初始示例图
 │   ├── useLiteGraphBridge.ts   # 核心桥接：生命周期 + 同步 + 历史/持久化
 │   ├── measure.ts              # 几何对齐与原生绘制测量
 │   └── debug.ts                # 开发期 window.__graphDebug
@@ -165,12 +200,16 @@ src/
 │   ├── MiniMap.tsx             # 迷你地图（点击导航）
 │   ├── SidePanel.tsx           # 右侧面板（检查器 / 开发验证页签）
 │   ├── InspectorPanel.tsx      # 选中节点详情与参数
+│   ├── Toast.tsx               # 连接被拒 / 导入结果提示
 │   ├── StatusBar.tsx           # 节点/连线/选中/缩放
 │   └── DevPanel.tsx            # 开发验证面板（仅 DEV）
+examples/
+└── text-to-image.workflow.json # 示例工作流（可直接导入）
 scripts/
-└── verify-canvas.mjs           # 画布基座 + 节点系统自动验证
+├── verify-canvas.mjs           # 画布交互逐项回归（63 项）
+└── verify-acceptance.mjs       # 阶段 5 全流程验收（18 项）
 ```
 
 ## 后续阶段
 
-阶段 5：验收与文档（全流程测试、性能 Profile、示例工作流）。遗留：节点折叠、静音/旁路 UI、非法连接提示 Toast、组（Group）序列化。
+阶段 0–5 已完成。后续可选方向：节点折叠/静音/旁路 UI、组（Group）渲染与导出、执行格式反向导入、执行状态与后端联调。

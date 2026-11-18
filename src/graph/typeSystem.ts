@@ -1,4 +1,5 @@
 import { LGraphCanvas, LiteGraph } from '@comfyorg/litegraph'
+import { reportConnectionError } from './connectionFeedback'
 import { isValidTypePair, PORT_COLORS } from './portTypes'
 
 let installed = false
@@ -15,7 +16,9 @@ export function installTypeSystem(): void {
   const original = LiteGraph.isValidConnection.bind(LiteGraph)
   LiteGraph.isValidConnection = (typeA, typeB) => {
     if (isValidTypePair(String(typeA ?? ''), String(typeB ?? ''))) return true
-    return original(typeA, typeB)
+    if (original(typeA, typeB)) return true
+    reportConnectionError(`无法连接：${String(typeA ?? '*')} → ${String(typeB ?? '*')} 类型不匹配`)
+    return false
   }
 
   Object.assign(LGraphCanvas.link_type_colors, PORT_COLORS)

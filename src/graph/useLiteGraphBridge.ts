@@ -2,12 +2,14 @@ import { useEffect, useState, type RefObject } from 'react'
 import { LGraph, LGraphCanvas, LGraphNode, LiteGraph, type LLink } from '@comfyorg/litegraph'
 import '@comfyorg/litegraph/style.css'
 import { resetGraphActions, useGraphActions } from './actions'
+import { beginConnectionGesture, endConnectionGesture } from './connectionFeedback'
 import { SnapshotHistory } from './history'
 import { getNodeDefinition, registerNodeDefinitions } from './nodeRegistry'
 import { readPersistedWorkflow, writePersistedWorkflow } from './persistence'
 import { seedDemoGraph } from './seed'
 import { applyWorkflow, graphToWorkflow } from './serialize'
 import { useGraphStore } from './store'
+import { useToastStore } from './toastStore'
 import { installTypeSystem } from './typeSystem'
 import { useUiStore } from './uiStore'
 import { parseWorkflow, toPromptAPI, type ImportIssue, type WorkflowUI } from './workflow'
@@ -376,10 +378,19 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
       pointerDownX = event.clientX
       pointerDownY = event.clientY
       pointerDownButton = event.button
+      // 只有左键按下才视为连线手势起点；悬停不记录错误
+      if (event.button === 0) beginConnectionGesture()
     }
     const onPointerUp = (event: PointerEvent) => {
       scheduleSync()
       store.setSelectionRect(null)
+
+      // 等 LiteGraph 处理完 drop 再读取结果：环路拦截发生在它自己的 pointerup 里
+      requestAnimationFrame(() => {
+        const message = endConnectionGesture()
+        if (message) useToastStore.getState().show(message, 'error')
+      })
+
       // 拖拽 / 缩放 / 连线结束都落一条历史记录；仅选中节点时快照不变，push 会自动去重
       commit()
       // 只有"点击"才切换连线选中，避免拖拽结束时误选脚下的连线
@@ -500,6 +511,40 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
       syncViewport()
     }
 
+    const fitView = () => {
+      if (!graph.nodes.length) return
+      const rect = element.getBoundingClientRect()
+      if (rect.width === 0 || rect.height === 0) return
+
+      let minX = Infinity
+      let minY = Infinity
+      let maxX = -Infinity
+      let maxY = -Infinity
+      for (const node of graph.nodes) {
+        minX = Math.min(minX, node.pos[0])
+        minY = Math.min(minY, node.pos[1])
+        maxX = Math.max(maxX, node.pos[0] + node.size[0])
+        maxY = Math.max(maxY, node.pos[1] + node.size[1])
+      }
+
+      const padding = 80
+      const zoom = Math.max(
+        0.2,
+        Math.min(
+          1.2,
+          (rect.width - padding * 2) / Math.max(1, maxX - minX),
+          (rect.height - padding * 2) / Math.max(1, maxY - minY),
+        ),
+      )
+      canvas.ds.scale = zoom
+      canvas.ds.offset = [
+        rect.width / (2 * zoom) - (minX + maxX) / 2,
+        rect.height / (2 * zoom) - (minY + maxY) / 2,
+      ]
+      canvas.setDirty(true, true)
+      syncViewport()
+    }
+
     const setWidgetValue = (nodeId: number, index: number, value: unknown) => {
       const widget = graph.getNodeById(nodeId)?.widgets?.[index]
       if (!widget) return
@@ -515,6 +560,7 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
       addNode,
       setWidgetValue,
       centerOn,
+      fitView,
       undo,
       redo,
       exportWorkflow,

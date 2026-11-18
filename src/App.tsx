@@ -4,6 +4,7 @@ import { HeaderActions } from './components/HeaderActions'
 import { NodeLibrary } from './components/NodeLibrary'
 import { SidePanel } from './components/SidePanel'
 import { StatusBar } from './components/StatusBar'
+import { ToastStack } from './components/Toast'
 import { useUiStore } from './graph/uiStore'
 import { useLiteGraphBridge } from './graph/useLiteGraphBridge'
 
@@ -29,6 +30,7 @@ export default function App() {
         <SidePanel context={context} />
       </div>
       <StatusBar />
+      <ToastStack />
     </div>
   )
 }

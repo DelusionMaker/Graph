@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "verify:canvas": "node scripts/verify-canvas.mjs",
+    "verify:acceptance": "node scripts/verify-acceptance.mjs",
     "test": "vitest run"
   },
   "dependencies": {

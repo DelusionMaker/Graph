@@ -15,6 +15,8 @@ export interface GraphActions {
   setWidgetValue: (nodeId: number, index: number, value: unknown) => void
   /** 把视口中心移到指定图坐标（迷你地图导航用） */
   centerOn: (graphX: number, graphY: number) => void
+  /** 缩放到刚好容纳全部节点（载入工作流后使用） */
+  fitView: () => void
   undo: () => void
   redo: () => void
   canUndo: boolean
@@ -31,6 +33,7 @@ export const defaultGraphActions: GraphActions = {
   addNode: noop,
   setWidgetValue: noop,
   centerOn: noop,
+  fitView: noop,
   undo: noop,
   redo: noop,
   canUndo: false,

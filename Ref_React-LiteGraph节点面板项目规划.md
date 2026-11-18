@@ -2,7 +2,7 @@
 
 > **版本**：v1.2（按 LiteGraph 0.17.2 类型定义校准）  
 > **日期**：2026-11-18  
-> **状态**：待评审  
+> **状态**：阶段 0–5 已实现（2026-11-18），验收结果见 README「阶段 5 验收报告」  
 > **修订要点**：v1.1 基于通用 LiteGraph 知识修订，v1.2 依据 `@comfyorg/litegraph@0.17.2` 的 `.d.ts` 与可编译 Spike 回正两处 API（`LGraphCanvas` 构造仍为 options 对象、`addWidget` 仍为位置参数）；锁定版本；明确事件归属与端口几何一致性；修正 `toPromptAPI` 覆盖缺陷与 id 类型；补充导入校验、阶段 0 量化验证清单与测试策略。
 > **定位**：在 Web 端复刻 ComfyUI 风格的可视化节点编辑器，以 React 构建 UI 层、LiteGraph.js 作为节点图引擎。
 
