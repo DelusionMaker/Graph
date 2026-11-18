@@ -68,7 +68,7 @@ try {
   const views = [
     { label: '0.2x', scale: 0.2, x: 40, y: 30 },
     { label: '1x', scale: 1, x: 90, y: 60 },
-    { label: '3x', scale: 3, x: -47, y: -93 },
+    { label: '3x', scale: 3, x: -27, y: -63 },
   ]
 
   for (const view of views) {
@@ -132,10 +132,10 @@ try {
   check('节点包围盒与 DOM 对齐 < 1px', bboxMax < 1, `${bboxMax.toFixed(2)}px`)
 
   // 在节点上方空白处框选，不能误选下方的节点（标题栏上下 30px 偏移的回归用例）
-  const canvasArea0 = await page.locator('.graph-canvas').boundingBox()
-  await page.mouse.move(canvasArea0.x + 450, canvasArea0.y + 100)
+  const phantomAnchor = await page.locator('.graph-node[data-node-id="2"]').boundingBox()
+  await page.mouse.move(phantomAnchor.x - 10, phantomAnchor.y - 70)
   await page.mouse.down()
-  await page.mouse.move(canvasArea0.x + 680, canvasArea0.y + 145, { steps: 8 })
+  await page.mouse.move(phantomAnchor.x + phantomAnchor.width + 10, phantomAnchor.y - 20, { steps: 8 })
   await page.mouse.up()
   await page.waitForTimeout(200)
   const phantom = await page.evaluate(() => window.__graphDebug.canvas.selectedItems.size)
@@ -320,10 +320,15 @@ try {
   const after = await page.evaluate(() =>
     window.__graphDebug.graph.nodes.map((node) => ({ id: Number(node.id), pos: [...node.pos] })),
   )
-  const deltas = after.map((node) => {
-    const origin = before.find((item) => item.id === node.id)
-    return { id: node.id, dx: node.pos[0] - origin.pos[0], dy: node.pos[1] - origin.pos[1] }
-  })
+  const selectedIds = await page.evaluate(() =>
+    [...window.__graphDebug.canvas.selectedItems].map((item) => Number(item.id)),
+  )
+  const deltas = after
+    .filter((node) => selectedIds.includes(node.id))
+    .map((node) => {
+      const origin = before.find((item) => item.id === node.id)
+      return { id: node.id, dx: node.pos[0] - origin.pos[0], dy: node.pos[1] - origin.pos[1] }
+    })
   check('拖动时 React 节点实时跟随', beforeLeft !== duringLeft, `${beforeLeft} → ${duringLeft}`)
   check(
     '多选拖拽保持相对位置',
@@ -337,6 +342,140 @@ try {
   const afterDrag = await measure()
   check('拖动后端口偏差 < 2px', afterDrag.port < TOLERANCE, `${afterDrag.port}px`)
   check('拖动后节点框偏差 < 2px', afterDrag.box < TOLERANCE, `${afterDrag.box}px`)
+
+  // 拖动右下角缩放：DOM 尺寸与输出端口必须在拖动过程中实时跟随
+  const resizeBox = await page.locator('.graph-node[data-node-id="1"]').boundingBox()
+  const sizeBeforeResize = await page.evaluate(() => [...window.__graphDebug.graph.getNodeById(1).size])
+  await page.mouse.move(resizeBox.x + resizeBox.width - 2, resizeBox.y + resizeBox.height - 2)
+  await page.mouse.down()
+  await page.mouse.move(resizeBox.x + resizeBox.width + 60, resizeBox.y + resizeBox.height + 40, { steps: 10 })
+  await page.waitForTimeout(120)
+  const liveResize = await page.evaluate(() => {
+    const api = window.__graphDebug
+    const node = api.graph.getNodeById(1)
+    const el = document.querySelector('.graph-node[data-node-id="1"]')
+    const port = document.querySelector('.graph-port[data-node-id="1"][data-direction="out"][data-port-index="0"]')
+    const canvasRect = api.canvas.canvas.getBoundingClientRect()
+    const portRect = port.getBoundingClientRect()
+    const [px] = api.canvas.ds.convertOffsetToCanvas([node.getOutputPos(0)[0], 0])
+    return {
+      nodeSize: [node.size[0], node.size[1]],
+      domSize: [el.offsetWidth, el.offsetHeight],
+      portDelta: Math.abs(portRect.left + portRect.width / 2 - (canvasRect.left + px)),
+    }
+  })
+  await page.mouse.up()
+  await page.waitForTimeout(200)
+  check(
+    '缩放节点时 DOM 实时跟随',
+    Math.abs(liveResize.nodeSize[0] - liveResize.domSize[0]) < 1 &&
+      Math.abs(liveResize.nodeSize[1] - liveResize.domSize[1]) < 1 &&
+      liveResize.nodeSize[0] > sizeBeforeResize[0] + 40,
+    `图 ${liveResize.nodeSize.join('×')} / DOM ${liveResize.domSize.join('×')}`,
+  )
+  check('缩放节点时输出端口跟随', liveResize.portDelta < TOLERANCE, `${liveResize.portDelta.toFixed(2)}px`)
+  const afterResize = await measure()
+  check(
+    '缩放后端口与节点框偏差 < 2px',
+    afterResize.port < TOLERANCE && afterResize.box < TOLERANCE,
+    `端口 ${afterResize.port}px / 节点框 ${afterResize.box}px`,
+  )
+
+  // 鼠标停在 Widget 上滚轮仍应缩放，且以光标为锚点
+  const widgetBox = await page
+    .locator('.graph-node[data-node-id="2"] .graph-widget[data-widget-name="steps"] input')
+    .boundingBox()
+  const anchor = [widgetBox.x + widgetBox.width / 2, widgetBox.y + widgetBox.height / 2]
+  const anchorPoint = await page.evaluate(([x, y]) => {
+    const api = window.__graphDebug
+    const rect = api.canvas.canvas.getBoundingClientRect()
+    return { scale: api.canvas.ds.scale, point: api.canvas.ds.convertCanvasToOffset([x - rect.left, y - rect.top]) }
+  }, anchor)
+  await page.mouse.move(anchor[0], anchor[1])
+  await page.mouse.wheel(0, -240)
+  await page.waitForTimeout(300)
+  const afterWheel = await page.evaluate(([x, y]) => {
+    const api = window.__graphDebug
+    const rect = api.canvas.canvas.getBoundingClientRect()
+    return { scale: api.canvas.ds.scale, point: api.canvas.ds.convertCanvasToOffset([x - rect.left, y - rect.top]) }
+  }, anchor)
+  const anchorDrift = Math.hypot(afterWheel.point[0] - anchorPoint.point[0], afterWheel.point[1] - anchorPoint.point[1])
+  check(
+    'Widget 上滚轮以光标为锚点缩放',
+    afterWheel.scale > anchorPoint.scale + 0.1 && anchorDrift < TOLERANCE,
+    `${anchorPoint.scale.toFixed(2)}x → ${afterWheel.scale.toFixed(2)}x，锚点漂移 ${anchorDrift.toFixed(2)}px`,
+  )
+  await setView(1, 0, 0)
+
+  // ⑧ 类型校验：VAE → MODEL 属于非法连接，必须被拦截
+  const vaeOut = await page
+    .locator('.graph-port[data-direction="out"][data-port-type="VAE"]')
+    .first()
+    .boundingBox()
+  const modelIn = await page
+    .locator('.graph-port[data-direction="in"][data-port-type="MODEL"]')
+    .first()
+    .boundingBox()
+  await page.mouse.move(vaeOut.x + vaeOut.width / 2, vaeOut.y + vaeOut.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(modelIn.x + modelIn.width / 2, modelIn.y + modelIn.height / 2, { steps: 15 })
+  await page.mouse.up()
+  await page.waitForTimeout(250)
+  const invalidLinks = await page.evaluate(() => window.__graphDebug.graph.links.size)
+  check('类型不匹配的连接被拦截', invalidLinks === 0, `${invalidLinks} 条`)
+
+  // ⑨ 端口颜色按类型着色（MODEL = #b39ddb）
+  const modelColor = await page.evaluate(() => {
+    const el = document.querySelector('.graph-port[data-port-type="MODEL"]')
+    return el ? getComputedStyle(el).backgroundColor : ''
+  })
+  check('端口按类型着色', modelColor === 'rgb(179, 157, 219)', modelColor)
+
+  // ⑩ Widget 双向绑定：修改 KSampler 的 steps，写回 LiteGraph widget
+  const stepsInput = page.locator('.graph-node[data-node-id="2"] .graph-widget[data-widget-name="steps"] input')
+  await stepsInput.fill('30')
+  await page.waitForTimeout(200)
+  const stepsValue = await page.evaluate(() => {
+    const node = window.__graphDebug.graph.getNodeById(2)
+    const widget = node?.widgets?.find((item) => item.name === 'steps')
+    return widget ? widget.value : null
+  })
+  const stepsShown = await stepsInput.inputValue()
+  check('Widget 修改写回图数据', Number(stepsValue) === 30 && stepsShown === '30', `图值 ${stepsValue} / 控件 ${stepsShown}`)
+
+  // ⑪ 节点库：搜索过滤 + 点击添加
+  const libraryItemCount = async () => page.locator('.node-library-item').count()
+  const allItems = await libraryItemCount()
+  await page.locator('.node-library-search').fill('采样')
+  await page.waitForTimeout(150)
+  const filtered = await libraryItemCount()
+  check('节点库搜索过滤', allItems > 1 && filtered === 1, `${allItems} → ${filtered}`)
+  await page.locator('.node-library-search').fill('')
+  await page.waitForTimeout(150)
+
+  const nodesBefore = await page.evaluate(() => window.__graphDebug.graph.nodes.length)
+  await page.getByRole('button', { name: /VAE 解码/ }).click()
+  await page.waitForTimeout(250)
+  const nodesAfter = await page.evaluate(() => window.__graphDebug.graph.nodes.length)
+  check('从节点库添加节点', nodesAfter === nodesBefore + 1, `${nodesBefore} → ${nodesAfter}`)
+
+  // ⑫ 新增节点可参与类型校验（LATENT → VAE 非法；LATENT → LATENT 合法）
+  // KSampler 的 LATENT 输出在画布可见区域内；EmptyLatent 在右侧，可能被开发面板遮住
+  const latentOut = await page
+    .locator('.graph-port[data-direction="out"][data-port-type="LATENT"]')
+    .first()
+    .boundingBox()
+  const latentIn = await page
+    .locator('.graph-port[data-direction="in"][data-port-type="LATENT"]')
+    .last()
+    .boundingBox()
+  await page.mouse.move(latentOut.x + latentOut.width / 2, latentOut.y + latentOut.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(latentIn.x + latentIn.width / 2, latentIn.y + latentIn.height / 2, { steps: 15 })
+  await page.mouse.up()
+  await page.waitForTimeout(250)
+  const validLinks = await page.evaluate(() => window.__graphDebug.graph.links.size)
+  check('同类型连接正常建立', validLinks === 1, `${validLinks} 条`)
 
   check('无页面异常', pageErrors.length === 0, `${pageErrors.length} 个`)
 } finally {

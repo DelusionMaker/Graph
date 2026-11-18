@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { LinkSnapshot, NodeSnapshot, SelectionRect, Viewport } from './types'
+import type { LinkSnapshot, NodeGeometryUpdate, NodeSnapshot, SelectionRect, Viewport } from './types'
 
 interface GraphState {
   /** LiteGraph 的渲染镜像，唯一真相源仍是 LGraph */
@@ -12,7 +12,7 @@ interface GraphState {
   setLinks: (links: LinkSnapshot[]) => void
   setSelection: (ids: number[]) => void
   setSelectionRect: (rect: SelectionRect | null) => void
-  updateNodePositions: (positions: Map<number, [number, number]>) => void
+  updateNodeGeometry: (updates: NodeGeometryUpdate[]) => void
   setViewport: (viewport: Viewport) => void
 }
 
@@ -29,15 +29,23 @@ export const useGraphStore = create<GraphState>((set) => ({
   setLinks: (links) => set({ links }),
   setSelection: (selectedIds) => set({ selectedIds }),
   setSelectionRect: (selectionRect) => set({ selectionRect }),
-  // 拖动时只更新位置变化的节点，未变节点保持同一引用，配合 React.memo 避免全量重渲染
-  updateNodePositions: (positions) =>
+  // 拖动/缩放时只更新变化的节点，未变节点保持同一引用，配合 React.memo 避免全量重渲染
+  updateNodeGeometry: (updates) =>
     set((state) => {
+      if (!updates.length) return state
+      const byId = new Map(updates.map((update) => [update.id, update]))
       let changed = false
       const nodes = state.nodes.map((node) => {
-        const next = positions.get(node.id)
-        if (!next || (node.pos[0] === next[0] && node.pos[1] === next[1])) return node
+        const update = byId.get(node.id)
+        if (!update) return node
         changed = true
-        return { ...node, pos: next }
+        return {
+          ...node,
+          pos: update.pos,
+          size: update.size,
+          inputs: update.inputs ?? node.inputs,
+          outputs: update.outputs ?? node.outputs,
+        }
       })
       return changed ? { nodes } : state
     }),

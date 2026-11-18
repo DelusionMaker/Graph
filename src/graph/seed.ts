@@ -1,13 +1,20 @@
-import type { LGraph } from '@comfyorg/litegraph'
-import { DemoSource, DemoTarget } from './registerNodes'
+import { LiteGraph, type LGraph } from '@comfyorg/litegraph'
 
-/** 阶段 1 的示例图；阶段 3 接入导入/持久化后由工作流数据替代 */
+/**
+ * 阶段 2 的示例工作流：加载器 / 文本编码 / 采样 / 空 latent。
+ * 不预置连线，交给自动验证脚本按类型创建，顺便验证类型系统。
+ */
 export function seedDemoGraph(graph: LGraph): void {
-  const source = new DemoSource('Source')
-  source.pos = [80, 120]
-  graph.add(source)
+  const place = (type: string, pos: [number, number]) => {
+    const node = LiteGraph.createNode(type)
+    if (!node) return null
+    node.pos = pos
+    graph.add(node)
+    return node
+  }
 
-  const target = new DemoTarget('Target')
-  target.pos = [440, 200]
-  graph.add(target)
+  place('loaders/CheckpointLoader', [60, 90])
+  place('sampling/KSampler', [400, 120])
+  place('conditioning/CLIPTextEncode', [60, 560])
+  place('latent/EmptyLatentImage', [620, 560])
 }

@@ -16,4 +16,6 @@ export const GEOMETRY = {
   nodeHeight: 120,
   /** 端口圆点半径（纯 React 视觉尺寸，LiteGraph 自身命中区为 NODE_SLOT_HEIGHT） */
   slotRadius: 6,
+  /** Widget 行高：24px 控件 + 2px 间距 */
+  widgetRowHeight: 26,
 } as const

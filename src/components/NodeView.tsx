@@ -1,6 +1,8 @@
 import { memo } from 'react'
 import { GEOMETRY } from '../graph/geometry'
+import { portColor } from '../graph/portTypes'
 import type { NodeSnapshot } from '../graph/types'
+import { Widget } from './Widget'
 
 interface Props {
   node: NodeSnapshot
@@ -8,6 +10,9 @@ interface Props {
 }
 
 export const NodeView = memo(function NodeView({ node, selected }: Props) {
+  const slotRows = Math.max(node.inputs.length, node.outputs.length, 1)
+  const widgetsTop = GEOMETRY.titleHeight + slotRows * GEOMETRY.slotHeight + 6
+
   return (
     <div
       className={`graph-node${selected ? ' is-selected' : ''}`}
@@ -33,7 +38,12 @@ export const NodeView = memo(function NodeView({ node, selected }: Props) {
               data-node-id={node.id}
               data-port-index={port.index}
               data-direction="in"
-              style={{ left: cx - GEOMETRY.slotRadius, top: cy - GEOMETRY.slotRadius }}
+              data-port-type={port.type}
+              style={{
+                left: cx - GEOMETRY.slotRadius,
+                top: cy - GEOMETRY.slotRadius,
+                background: portColor(port.type),
+              }}
               title={`${port.name} (${port.type})`}
             />
             <span className="graph-port-label" style={{ left: cx + 12, top: cy - 9 }}>
@@ -52,7 +62,12 @@ export const NodeView = memo(function NodeView({ node, selected }: Props) {
               data-node-id={node.id}
               data-port-index={port.index}
               data-direction="out"
-              style={{ left: cx - GEOMETRY.slotRadius, top: cy - GEOMETRY.slotRadius }}
+              data-port-type={port.type}
+              style={{
+                left: cx - GEOMETRY.slotRadius,
+                top: cy - GEOMETRY.slotRadius,
+                background: portColor(port.type),
+              }}
               title={`${port.name} (${port.type})`}
             />
             <span className="graph-port-label is-output" style={{ right: node.size[0] - cx + 12, top: cy - 9 }}>
@@ -61,6 +76,14 @@ export const NodeView = memo(function NodeView({ node, selected }: Props) {
           </div>
         )
       })}
+
+      {node.widgets.length > 0 && (
+        <div className="graph-widgets" style={{ top: widgetsTop }}>
+          {node.widgets.map((widget) => (
+            <Widget key={widget.index} nodeId={node.id} widget={widget} />
+          ))}
+        </div>
+      )}
     </div>
   )
 })

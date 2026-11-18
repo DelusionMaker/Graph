@@ -1,13 +1,23 @@
 import { useEffect, useState, type RefObject } from 'react'
 import { LGraph, LGraphCanvas, LGraphNode, LiteGraph, type LLink } from '@comfyorg/litegraph'
 import '@comfyorg/litegraph/style.css'
-import { registerDemoNodes } from './registerNodes'
+import { useGraphActions } from './actions'
+import { getNodeDefinition, registerNodeDefinitions } from './nodeRegistry'
+import { installTypeSystem } from './portTypes'
 import { useGraphStore } from './store'
-import type { LinkSnapshot, NodeSnapshot } from './types'
+import type {
+  LinkSnapshot,
+  NodeGeometryUpdate,
+  NodeSnapshot,
+  PortSnapshot,
+  WidgetSnapshot,
+} from './types'
 
 export interface GraphContext {
   graph: LGraph
   canvas: LGraphCanvas
+  /** 在视口中心或指定图坐标处添加节点 */
+  addNode: (type: string, pos?: [number, number]) => void
 }
 
 /**
@@ -18,14 +28,15 @@ export interface GraphContext {
  * - 画布交互（平移/缩放/框选/拖拽/连线）全部由 LiteGraph 处理，本 hook 只做同步；
  * - React 侧不直接写 LGraph，后续的图操作统一经 graph 提供的命令接口。
  */
-export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement | null>): GraphContext | null {
+export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): GraphContext | null {
   const [context, setContext] = useState<GraphContext | null>(null)
 
   useEffect(() => {
     const element = canvasRef.current
     if (!element) return
 
-    registerDemoNodes()
+    registerNodeDefinitions()
+    installTypeSystem()
     const graph = new LGraph()
     // 0.17.2：第三个参数是 options 对象，仅支持 skip_events / viewport / skip_render / autoresize
     const canvas = new LGraphCanvas(element, graph, { autoresize: true })
@@ -54,6 +65,33 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement | null
 
     const store = useGraphStore.getState()
 
+    /** 端口坐标直接取 LiteGraph 的权威计算结果；输出端口 x 依赖节点宽度，缩放节点后需要重算 */
+    const readPorts = (node: LGraphNode, direction: 'in' | 'out'): PortSnapshot[] => {
+      const [nx, ny] = node.pos
+      if (direction === 'in') {
+        return (node.inputs ?? []).map((port, index) => {
+          const [px, py] = node.getInputPos(index)
+          return {
+            index,
+            name: port.name ?? '',
+            type: String(port.type),
+            connected: port.link != null,
+            offset: [px - nx, py - ny] as [number, number],
+          }
+        })
+      }
+      return (node.outputs ?? []).map((port, index) => {
+        const [px, py] = node.getOutputPos(index)
+        return {
+          index,
+          name: port.name ?? '',
+          type: String(port.type),
+          connected: (port.links?.length ?? 0) > 0,
+          offset: [px - nx, py - ny] as [number, number],
+        }
+      })
+    }
+
     const syncSnapshot = () => {
       const nodes: NodeSnapshot[] = graph.nodes.map((node) => {
         const [x, y] = node.pos
@@ -64,24 +102,20 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement | null
           title: node.title,
           pos: [x, y],
           size: [node.size[0], node.size[1]],
-          inputs: (node.inputs ?? []).map((port, index) => {
-            const [px, py] = node.getInputPos(index)
+          inputs: readPorts(node, 'in'),
+          outputs: readPorts(node, 'out'),
+          // widget 的值存在 LiteGraph widget 上（唯一真相源），kind / 取值范围来自节点定义
+          widgets: (node.widgets ?? []).map((widget, index): WidgetSnapshot => {
+            const schema = getNodeDefinition(node.type)?.widgets[index]
             return {
               index,
-              name: port.name ?? '',
-              type: String(port.type),
-              connected: port.link != null,
-              offset: [px - x, py - y] as [number, number],
-            }
-          }),
-          outputs: (node.outputs ?? []).map((port, index) => {
-            const [px, py] = node.getOutputPos(index)
-            return {
-              index,
-              name: port.name ?? '',
-              type: String(port.type),
-              connected: (port.links?.length ?? 0) > 0,
-              offset: [px - x, py - y] as [number, number],
+              name: widget.name ?? schema?.name ?? `widget_${index}`,
+              kind: schema?.kind ?? 'text',
+              value: widget.value,
+              values: schema?.values,
+              min: schema?.min,
+              max: schema?.max,
+              step: schema?.step,
             }
           }),
         }
@@ -124,13 +158,32 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement | null
       })
     }
 
-    // 拖动节点时实时同步位置：原生节点绘制已关闭，
-    // 若只在 pointerup 同步，React 节点会停在原地、松手才瞬移。
+    // 拖动/缩放节点时实时同步几何：原生节点绘制已关闭，
+    // 若只在 pointerup 同步，React 节点会停在原地、松手才瞬移；
+    // 缩放还需要同步 size 与端口偏移（输出端口 x 依赖节点宽度）。
     let positionFrame = 0
-    const syncPositions = () => {
-      const positions = new Map<number, [number, number]>()
-      for (const node of graph.nodes) positions.set(Number(node.id), [node.pos[0], node.pos[1]])
-      useGraphStore.getState().updateNodePositions(positions)
+    const syncLiveGeometry = () => {
+      const state = useGraphStore.getState()
+      const byId = new Map(state.nodes.map((node) => [node.id, node]))
+      const updates: NodeGeometryUpdate[] = []
+
+      for (const node of graph.nodes) {
+        const id = Number(node.id)
+        const snapshot = byId.get(id)
+        if (!snapshot) continue
+        const posChanged = snapshot.pos[0] !== node.pos[0] || snapshot.pos[1] !== node.pos[1]
+        const sizeChanged = snapshot.size[0] !== node.size[0] || snapshot.size[1] !== node.size[1]
+        if (!posChanged && !sizeChanged) continue
+        updates.push({
+          id,
+          pos: [node.pos[0], node.pos[1]],
+          size: [node.size[0], node.size[1]],
+          inputs: sizeChanged ? readPorts(node, 'in') : undefined,
+          outputs: sizeChanged ? readPorts(node, 'out') : undefined,
+        })
+      }
+
+      state.updateNodeGeometry(updates)
     }
     const onPointerMove = (event: PointerEvent) => {
       // 框选提示框改由 React 绘制：
@@ -153,7 +206,7 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement | null
       if (positionFrame) return
       positionFrame = requestAnimationFrame(() => {
         positionFrame = 0
-        syncPositions()
+        syncLiveGeometry()
       })
     }
 
@@ -258,6 +311,9 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement | null
       canvas.setDirty(true, true)
       syncViewport()
     }
+    // 挂到画布容器而不是 canvas：鼠标停在 Widget 上时事件不会落到 canvas，
+    // 但滚轮仍应以光标为锚点缩放画布
+    const wheelTarget = element.parentElement ?? element
 
     graph.onNodeAdded = scheduleSync
     graph.onNodeRemoved = scheduleSync
@@ -269,14 +325,41 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement | null
     element.addEventListener('pointerup', onPointerUp, true)
     element.addEventListener('pointermove', onPointerMove, true)
     element.addEventListener('keydown', onKeyDown)
-    element.addEventListener('wheel', onWheel, { passive: false })
+    wheelTarget.addEventListener('wheel', onWheel, { passive: false })
 
     const observer = new ResizeObserver(() => canvas.resize())
     observer.observe(element)
 
+    const addNode = (type: string, pos?: [number, number]) => {
+      const node = LiteGraph.createNode(type)
+      if (!node) return
+      if (pos) {
+        node.pos = [pos[0], pos[1]]
+      } else {
+        const rect = element.getBoundingClientRect()
+        const [cx, cy] = canvas.convertCanvasToOffset([rect.width / 2, rect.height / 2])
+        node.pos = [cx - node.size[0] / 2, cy - node.size[1] / 2]
+      }
+      graph.add(node)
+      canvas.selectItems([node])
+      canvas.setDirty(true, true)
+      scheduleSync()
+    }
+
+    const setWidgetValue = (nodeId: number, index: number, value: unknown) => {
+      const widget = graph.getNodeById(nodeId)?.widgets?.[index]
+      if (!widget) return
+      ;(widget as { value: unknown }).value = value
+      canvas.setDirty(true, true)
+      scheduleSync()
+    }
+
+    // UI 只通过这些动作访问图引擎，不直接持有 LGraph
+    useGraphActions.setState({ addNode, setWidgetValue })
+
     syncSnapshot()
     syncViewport()
-    setContext({ graph, canvas })
+    setContext({ graph, canvas, addNode })
 
     return () => {
       observer.disconnect()
@@ -284,11 +367,12 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement | null
       element.removeEventListener('pointerup', onPointerUp, true)
       element.removeEventListener('pointermove', onPointerMove, true)
       element.removeEventListener('keydown', onKeyDown)
-      element.removeEventListener('wheel', onWheel)
+      wheelTarget.removeEventListener('wheel', onWheel)
 
       cancelAnimationFrame(syncFrame)
       cancelAnimationFrame(positionFrame)
       clearLinkSelection()
+      useGraphActions.setState({ addNode: () => {}, setWidgetValue: () => {} })
 
       graph.onNodeAdded = undefined
       graph.onNodeRemoved = undefined
