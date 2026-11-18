@@ -446,7 +446,8 @@ try {
   // ⑪ 节点库：搜索过滤 + 点击添加
   const libraryItemCount = async () => page.locator('.node-library-item').count()
   const allItems = await libraryItemCount()
-  await page.locator('.node-library-search').fill('采样')
+  // 用唯一命中项做断言：新增节点后 "采样" 会同时命中 shader/Texture 的描述
+  await page.locator('.node-library-search').fill('KSampler')
   await page.waitForTimeout(150)
   const filtered = await libraryItemCount()
   check('节点库搜索过滤', allItems > 1 && filtered === 1, `${allItems} → ${filtered}`)
@@ -461,7 +462,10 @@ try {
 
   // 拖拽添加：拖动过程中不建节点，只有落在画布才建一个，且落点跟随鼠标
   const dragBefore = await page.evaluate(() => window.__graphDebug.graph.nodes.length)
-  const libItemBox = await page.locator('.node-library-item').first().boundingBox()
+  // 节点库现在是左栏下半区，先滚到顶部保证首个条目在可视区域内
+  const firstLibraryItem = page.locator('.node-library-item').first()
+  await firstLibraryItem.scrollIntoViewIfNeeded()
+  const libItemBox = await firstLibraryItem.boundingBox()
   const dragCanvasBox = await page.locator('.graph-canvas').boundingBox()
   await page.mouse.move(libItemBox.x + 30, libItemBox.y + 12)
   await page.mouse.down()

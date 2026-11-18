@@ -1,4 +1,5 @@
 import type { LGraph, LGraphCanvas } from '@comfyorg/litegraph'
+import { graphToCanvasPoint, graphToScreen } from './coords'
 
 /** 规划中的验收阈值：偏差 < 2px */
 export const TOLERANCE = 2
@@ -33,16 +34,10 @@ export interface NativeMeasurement {
 type Tuple = [number, number]
 
 function screenMapper(canvas: LGraphCanvas) {
-  const rect = canvas.canvas.getBoundingClientRect()
-  const ds = canvas.ds
   return {
-    scale: ds.scale,
-    // 直接复用 LiteGraph 自己的换算：canvas 内坐标 = (图坐标 + offset) * scale。
-    // 不要在测量代码里另写一份公式，否则测量与渲染会犯同一个错误。
-    toScreen: (x: number, y: number): Tuple => {
-      const [cx, cy] = ds.convertOffsetToCanvas([x, y])
-      return [rect.left + cx, rect.top + cy]
-    },
+    scale: canvas.ds.scale,
+    // 换算规则集中在 coords.ts，测量代码不再复刻公式
+    toScreen: (x: number, y: number): Tuple => graphToScreen(canvas, x, y),
   }
 }
 
@@ -111,7 +106,7 @@ export function measureNativeDrawing(graph: LGraph, canvas: LGraphCanvas): Nativ
   let sampled = 0
 
   for (const node of graph.nodes) {
-    const [left, top] = ds.convertOffsetToCanvas([node.pos[0], node.pos[1]])
+    const [left, top] = graphToCanvasPoint(canvas, node.pos[0], node.pos[1])
     const x = Math.round((left + 2) * dprX)
     const y = Math.round((top + 2) * dprY)
     const w = Math.round((node.size[0] * ds.scale - 4) * dprX)

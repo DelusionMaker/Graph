@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent, type RefObject } from 'react'
+import { screenToGraph } from '../graph/coords'
 import { attachDebugApi } from '../graph/debug'
 import type { GraphContext } from '../graph/useLiteGraphBridge'
 import { MiniMap } from './MiniMap'
@@ -44,8 +45,7 @@ export function GraphCanvas({ canvasRef, context }: Props) {
     const type = event.dataTransfer.getData(NODE_DRAG_MIME)
     if (!type || !context) return
     event.preventDefault()
-    const rect = event.currentTarget.getBoundingClientRect()
-    const [x, y] = context.canvas.convertCanvasToOffset([event.clientX - rect.left, event.clientY - rect.top])
+    const [x, y] = screenToGraph(context.canvas, event.clientX, event.clientY)
     // 让拖拽落点大致落在节点标题栏位置
     context.addNode(type, [x - 110, y - 14])
   }

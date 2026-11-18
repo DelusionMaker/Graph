@@ -1,4 +1,5 @@
 import { useGraphActions } from '../graph/actions'
+import { viewportGraphRect } from '../graph/coords'
 import { useGraphStore } from '../graph/store'
 
 const WIDTH = 200
@@ -17,10 +18,7 @@ export function MiniMap() {
 
   if (!nodes.length || canvasSize.w === 0 || canvasSize.h === 0) return null
 
-  const viewX = -viewport.x
-  const viewY = -viewport.y
-  const viewW = canvasSize.w / viewport.zoom
-  const viewH = canvasSize.h / viewport.zoom
+  const { x: viewX, y: viewY, w: viewW, h: viewH } = viewportGraphRect(viewport, canvasSize)
 
   // 地图边界只由节点决定（不并入视口），否则点击移动视口后投影会重新缩放，
   // 表现为地图内容整体跳动、点击落点漂移。

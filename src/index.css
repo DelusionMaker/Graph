@@ -129,20 +129,146 @@ select:focus-visible {
 }
 
 .workspace {
+  position: relative;
   display: flex;
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
 }
 
+/* ---------- 左栏：3D 视口 + 节点库 ---------- */
+
+.viewer-dock {
+  display: flex;
+  flex: 0 0 360px;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: var(--bg-chrome);
+}
+
+.viewer-dock-viewport {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 240px;
+  overflow: hidden;
+}
+
+.viewer-toolbar {
+  display: flex;
+  flex: 0 0 32px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.viewer-shapes {
+  display: flex;
+  gap: 2px;
+}
+
+.viewer-toolbar button {
+  padding: 3px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--bg-control);
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.viewer-toolbar button:hover {
+  border-color: var(--accent);
+}
+
+.viewer-toolbar button.is-active {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.viewer-perf-toggle {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.viewer-collapse {
+  flex: 0 0 auto;
+}
+
+.viewport-3d {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.viewport-3d canvas {
+  display: block;
+}
+
+.perf-hud {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: flex;
+  gap: 8px;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #e8e8e8;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.viewer-separator {
+  flex: 0 0 5px;
+  background: var(--border);
+  cursor: row-resize;
+}
+
+.viewer-separator:hover {
+  background: var(--accent);
+}
+
+.viewer-library {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+body.is-resizing-dock {
+  cursor: row-resize;
+  user-select: none;
+}
+
+.dock-trigger {
+  display: none;
+  padding: 5px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg-control);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
 /* ---------- 节点库 ---------- */
 
 .node-library {
   display: flex;
-  flex: 0 0 240px;
+  flex: 1 1 0;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
-  border-right: 1px solid var(--border);
   background: var(--bg-chrome);
 }
 
@@ -658,8 +784,8 @@ select:focus-visible {
 /* ---------- 响应式 ---------- */
 
 @media (max-width: 1280px) {
-  .node-library {
-    flex-basis: 200px;
+  .viewer-dock {
+    flex-basis: 320px;
   }
 
   .side-panel {
@@ -671,13 +797,30 @@ select:focus-visible {
   .side-panel {
     display: none;
   }
+
+  .viewer-dock {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    width: 360px;
+    flex-basis: auto;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: 8px 0 24px var(--shadow);
+  }
+
+  .viewer-dock.is-open {
+    transform: translateX(0);
+  }
+
+  .dock-trigger {
+    display: inline-flex;
+  }
 }
 
 @media (max-width: 860px) {
-  .node-library {
-    display: none;
-  }
-
   .status-hint {
     display: none;
   }

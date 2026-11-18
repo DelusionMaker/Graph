@@ -3,6 +3,7 @@ import { LGraph, LGraphCanvas, LGraphNode, LiteGraph, type LLink } from '@comfyo
 import '@comfyorg/litegraph/style.css'
 import { resetGraphActions, useGraphActions } from './actions'
 import { beginConnectionGesture, endConnectionGesture } from './connectionFeedback'
+import { canvasPointToGraph, centerOffset, readViewport } from './coords'
 import { SnapshotHistory } from './history'
 import { getNodeDefinition, registerNodeDefinitions } from './nodeRegistry'
 import { readPersistedWorkflow, writePersistedWorkflow } from './persistence'
@@ -492,7 +493,7 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
         node.pos = [pos[0], pos[1]]
       } else {
         const rect = element.getBoundingClientRect()
-        const [cx, cy] = canvas.convertCanvasToOffset([rect.width / 2, rect.height / 2])
+        const [cx, cy] = canvasPointToGraph(canvas, rect.width / 2, rect.height / 2)
         node.pos = [cx - node.size[0] / 2, cy - node.size[1] / 2]
       }
       graph.add(node)
@@ -503,10 +504,8 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
 
     const centerOn = (graphX: number, graphY: number) => {
       const rect = element.getBoundingClientRect()
-      const scale = canvas.ds.scale
-      // 屏幕坐标 = (图坐标 + offset) * scale；要让该图坐标落在画布中心：
-      // offset = 画布尺寸 / (2 * scale) - 图坐标（注意是"尺寸减坐标"，写反会把点击位置镜像到另一侧）
-      canvas.ds.offset = [rect.width / (2 * scale) - graphX, rect.height / (2 * scale) - graphY]
+      // 屏幕坐标 = (图坐标 + offset) * scale；居中所需的 offset 规则见 coords.ts
+      canvas.ds.offset = centerOffset(readViewport(canvas), graphX, graphY, rect.width, rect.height)
       canvas.setDirty(true, true)
       syncViewport()
     }
@@ -537,10 +536,13 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
         ),
       )
       canvas.ds.scale = zoom
-      canvas.ds.offset = [
-        rect.width / (2 * zoom) - (minX + maxX) / 2,
-        rect.height / (2 * zoom) - (minY + maxY) / 2,
-      ]
+      canvas.ds.offset = centerOffset(
+        { x: 0, y: 0, zoom },
+        (minX + maxX) / 2,
+        (minY + maxY) / 2,
+        rect.width,
+        rect.height,
+      )
       canvas.setDirty(true, true)
       syncViewport()
     }

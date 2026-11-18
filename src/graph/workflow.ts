@@ -8,6 +8,7 @@
 export const SCHEMA_VERSION = 1
 
 export const PORT_TYPES = [
+  // 既有 ComfyUI 类型，全部保留
   'MODEL',
   'CLIP',
   'VAE',
@@ -22,6 +23,14 @@ export const PORT_TYPES = [
   'STRING',
   'BOOLEAN',
   '*',
+  // shader 值类型
+  'VEC2',
+  'VEC3',
+  'COLOR',
+  // 资源与终端类型
+  'GEOMETRY',
+  'MATERIAL',
+  'POSTFX',
 ] as const
 
 export type PortType = (typeof PORT_TYPES)[number]
