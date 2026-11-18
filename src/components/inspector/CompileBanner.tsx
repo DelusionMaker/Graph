@@ -1,7 +1,10 @@
+import { useGraphActions } from '../../graph/actions'
 import type { ProgramError } from '../../shader/useProgramStore'
 
-/** 编译错误首行提示；错误详情在场景概览里完整列出 */
+/** 编译错误首行提示；点击可定位到出错节点 */
 export function CompileBanner({ errors }: { errors: ProgramError[] }) {
+  const focusNode = useGraphActions((state) => state.focusNode)
+
   if (errors.length === 0) return null
 
   const first = errors[0]
@@ -10,10 +13,17 @@ export function CompileBanner({ errors }: { errors: ProgramError[] }) {
   return (
     <div className="inspector-error-banner" role="alert">
       <strong>编译失败</strong>
-      <span>
+      <button
+        type="button"
+        className="inspector-error-link"
+        title="定位到出错节点"
+        onClick={() => {
+          if (first.nodeId != null) focusNode(first.nodeId)
+        }}
+      >
         {first.nodeId != null ? `#${first.nodeId} ` : ''}
         {firstLine}
-      </span>
+      </button>
       <span className="inspector-error-hint">视口保留上一次成功结果</span>
     </div>
   )

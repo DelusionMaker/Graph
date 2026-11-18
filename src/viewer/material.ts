@@ -9,7 +9,7 @@ import {
 } from 'three'
 import type { CompiledProgram, UniformValue } from '../shader/compiler'
 import { SHADER_UV_ASSIGN, SHADER_UV_VARYING } from '../shader/glsl/chunks'
-import { resolveTexture } from './assets'
+import { applyTextureSettings, resolveTexture } from './assets'
 
 /** onBeforeCompile 提供的 shader 对象中我们实际用到的最小结构 */
 interface CompiledShader {
@@ -46,9 +46,18 @@ function toThreeValue(uniform: UniformValue): unknown {
 export function buildUniforms(program: CompiledProgram | null): Record<string, IUniform> {
   const uniforms: Record<string, IUniform> = {}
   if (!program) return uniforms
+
   for (const [name, uniform] of Object.entries(program.uniforms)) {
     uniforms[name] = { value: toThreeValue(uniform) }
   }
+
+  // 纹理的 wrap / flipY 来自节点 widget，编译后按 slot 重新应用
+  for (const slot of program.textureSlots) {
+    const texture = resolveTexture(slot.assetId)
+    applyTextureSettings(texture, slot.wrap, slot.flipY)
+    uniforms[slot.uniform] = { value: texture }
+  }
+
   return uniforms
 }
 

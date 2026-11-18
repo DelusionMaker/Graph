@@ -1,3 +1,4 @@
+import { useGraphActions } from '../../graph/actions'
 import type { EnvironmentSettings } from '../../shader/compiler'
 import { useProgramStore, type ProgramStatus } from '../../shader/useProgramStore'
 
@@ -24,6 +25,7 @@ export function SceneOverview() {
   const program = useProgramStore((state) => state.program)
   const errors = useProgramStore((state) => state.errors)
   const lastGood = useProgramStore((state) => state.lastGoodProgram)
+  const focusNode = useGraphActions((state) => state.focusNode)
   const environment = program?.environment ?? FALLBACK_ENV
 
   return (
@@ -81,10 +83,18 @@ export function SceneOverview() {
         <section>
           <h3>编译错误</h3>
           {errors.map((error, index) => (
-            <p key={`${error.nodeId ?? 'global'}-${index}`} className="inspector-error">
+            <button
+              key={`${error.nodeId ?? 'global'}-${index}`}
+              type="button"
+              className="inspector-error inspector-error-link"
+              title={error.nodeId != null ? '定位到出错节点' : undefined}
+              onClick={() => {
+                if (error.nodeId != null) focusNode(error.nodeId)
+              }}
+            >
               {error.nodeId != null ? `#${error.nodeId} ` : ''}
               {error.message}
-            </p>
+            </button>
           ))}
         </section>
       )}

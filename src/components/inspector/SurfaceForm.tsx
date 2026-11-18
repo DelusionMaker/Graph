@@ -9,7 +9,10 @@ const INPUT_LABELS: Record<string, string> = {
   emissive: '自发光',
 }
 
-/** material/Surface：着色模式 + 四个输入的来源 */
+/**
+ * material/Surface：着色模式 + 输入来源。
+ * 未连线的输入直接显示节点上的兜底常量，改值即可预览。
+ */
 export function SurfaceForm({ node }: { node: NodeSnapshot }) {
   const links = useGraphStore((state) => state.links)
   const nodes = useGraphStore((state) => state.nodes)
@@ -26,12 +29,30 @@ export function SurfaceForm({ node }: { node: NodeSnapshot }) {
             (item) => item.targetId === node.id && item.targetSlot === input.index,
           )
           const origin = link ? nodes.find((item) => item.id === link.originId) : undefined
+          const label = INPUT_LABELS[input.name] ?? input.name
+
+          if (origin) {
+            return (
+              <div key={input.name} className="inspector-input-row">
+                <span className="inspector-input-name">{label}</span>
+                <span className="inspector-input-state is-linked">
+                  来自 #{origin.id} {origin.title}
+                </span>
+              </div>
+            )
+          }
+
+          const fallback = node.widgets.find((widget) => widget.name === input.name)
+          if (fallback) {
+            return (
+              <Widget key={input.name} nodeId={node.id} widget={fallback} label={label} />
+            )
+          }
+
           return (
             <div key={input.name} className="inspector-input-row">
-              <span className="inspector-input-name">{INPUT_LABELS[input.name] ?? input.name}</span>
-              <span className={`inspector-input-state${origin ? ' is-linked' : ''}`}>
-                {origin ? `来自 #${origin.id} ${origin.title}` : '使用默认值'}
-              </span>
+              <span className="inspector-input-name">{label}</span>
+              <span className="inspector-input-state">使用默认值</span>
             </div>
           )
         })}

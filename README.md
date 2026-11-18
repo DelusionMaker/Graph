@@ -1,6 +1,8 @@
-# React + LiteGraph 节点编辑器
+# React + LiteGraph 节点编辑器（含 3D / Shader 预览）
 
-按《React-LiteGraph节点面板项目规划》实现的 Web 节点编辑器，**阶段 0–5 已完成**。LiteGraph 负责图模型与画布交互，React 渲染节点 DOM、Widget、节点库与外围 UI；数据层支持双格式导入导出、持久化与撤销/重做；视觉层提供双主题、LOD、迷你地图、检查器与响应式布局。
+按《React-LiteGraph节点面板项目规划》实现的 Web 节点编辑器，**阶段 0–5 与 3D/Shader 扩展均已完成**。LiteGraph 负责图模型与画布交互，React 渲染节点 DOM、Widget、节点库与外围 UI；数据层支持双格式导入导出、持久化与撤销/重做；视觉层提供双主题、LOD、迷你地图、检查器与响应式布局。
+
+在节点图之上实现了 R3F 3D 预览：`scene/Mesh` + `material/Surface` 经 GLSL 编译器生成 PBR 注入或 Unlit 材质，`postfx/*` 节点组成后处理链，Inspector 可直接调参并实时预览。
 
 ## 环境
 
@@ -14,7 +16,7 @@ npm install
 npm run dev
 ```
 
-打开 http://localhost:5173 。顶部是撤销/重做、载入示例与导入导出，左侧节点库，中央画布，右侧检查器（开发环境下可切到验证面板）。
+打开 http://localhost:5173 。顶部是撤销/重做、载入示例（含「载入 3D 示例」）与导入导出；左侧上半是 3D 视口、下半是节点库；中央画布；右侧检查器（开发环境下可切到验证面板）。
 
 构建检查：
 
@@ -22,7 +24,7 @@ npm run dev
 npm run build
 ```
 
-单元测试（数据层）：
+单元测试（数据层与编译器）：
 
 ```bash
 npm test
@@ -33,9 +35,10 @@ npm test
 ```bash
 npm run verify:canvas      # 画布交互逐项回归
 npm run verify:acceptance  # 阶段 5 全流程验收（示例工作流 / 性能 / 异常路径）
+npm run verify:3d          # 3D / Shader / 后处理验收（33 项）
 ```
 
-示例工作流见 `examples/text-to-image.workflow.json`，也可以在应用内点「载入示例」直接载入。
+示例工作流见 `examples/`：`text-to-image.workflow.json`（ComfyUI 风格）与 `shader-demo.workflow.json`（3D/Shader）。也可以在应用内点「载入示例」或「载入 3D 示例」直接载入。
 
 ## 当前能力（阶段 5）
 
@@ -62,8 +65,13 @@ npm run verify:acceptance  # 阶段 5 全流程验收（示例工作流 / 性能
 | 检查器 | 右侧面板显示选中节点的类型、布局、端口与参数（可直接编辑） |
 | 响应式 | 1280px / 1920px 无溢出，窄屏逐级收起检查器与节点库 |
 | 无障碍 | 画布/按钮/Widget 均有可访问名称，键盘焦点可见，尊重 `prefers-reduced-motion` |
+| 3D 预览 | 左栏 R3F 视口；Box / Sphere / TorusKnot / glTF 上传；OrbitControls；相机随工作流保存（schema v2） |
+| Shader 节点 | 20 个端口类型、19 个场景/材质/shader/postfx 节点；PBR 注入与 Unlit 两种模式 |
+| 实时编译 | 结构签名区分重编译与 uniform 刷新；编译失败保留上一帧并在节点与 Inspector 标红 |
+| 后处理 | Bloom / SSAO / Vignette / SMAA，按连线顺序执行；空链不渲染 Composer |
+| 资源与性能 | glTF / 贴图上传与释放；FPS / 帧时间 / draw calls / 三角面数 HUD（4Hz） |
 
-内置 5 种示例节点：Checkpoint 加载器、CLIP 文本编码、KSampler、空潜空间图像、VAE 解码。
+内置 24 种节点：5 个 ComfyUI 节点（Checkpoint / CLIP / KSampler / 空潜空间 / VAE 解码）与 19 个场景、材质、shader、渲染、后处理节点。
 
 右侧「开发验证」面板可手动测量几何偏差与原生绘制隐藏情况；`window.__graphDebug` 提供同一套测量接口与导入导出/撤销重做入口供自动化脚本调用（仅开发构建挂载）。
 
@@ -83,11 +91,24 @@ npm run verify:acceptance  # 阶段 5 全流程验收（示例工作流 / 性能
 - **无障碍**：画布、工具按钮、Widget 控件均有可访问名称；
 - **稳定性**：无页面异常。
 
-单元测试 `npm test`（Vitest）覆盖纯数据层 17 项：`toPromptAPI` 的连线/静音/Widget 覆盖规则、`parseWorkflow` 的三级校验与索引重建、`SnapshotHistory` 的去重/上限/分支截断/合并窗口。
+单元测试 `npm test`（Vitest）覆盖 6 个文件 / 53 项：`toPromptAPI` 的连线/静音/Widget 覆盖规则、`parseWorkflow` 的三级校验与索引重建（含 v1 → v2 迁移）、`SnapshotHistory` 的去重/上限/分支截断/合并窗口、编译器的签名/注入/Unlit/错误、后处理链顺序、连接类型矩阵。
+
+`npm run verify:3d` 共 33 项：
+
+- 几何体切换与工具条 → 节点同步；
+- OrbitControls 相机写回与持久化；
+- uniform-only 更新不改变 `programHash`；
+- Environment 阴影 / 光照实时生效；
+- Bloom / Vignette 链顺序；
+- 编译错误定位、节点标红、保留上一帧；
+- schema v2 导出导入；
+- glTF 有效上传与无效文件拦截；
+- Math 枚举切换 300ms 内重编译；
+- 性能采样与 demand 空闲行为。
 
 ## 阶段 5 验收报告
 
-`npm run verify:acceptance` 覆盖规划 §11.1 的全流程检查，**19/19 通过**：
+`npm run verify:acceptance` 覆盖规划 §11.1 的全流程检查，**19/19 通过**。3D / Shader 扩展验收见 `npm run verify:3d`（26/26）。
 
 | 验收项 | 结果 |
 |---|---|
@@ -111,7 +132,12 @@ npm run verify:acceptance  # 阶段 5 全流程验收（示例工作流 / 性能
 
 - 节点折叠、静音/旁路尚未提供 UI（数据模型的 `mode` 已支持，执行格式会跳过非 0 节点）；
 - 组（Group）可反序列化但暂不渲染与导出；
-- 导入只接受 UI 格式（`nodes/links`）；执行格式用于导出，不支持反向还原布局。
+- 导入只接受 UI 格式（`nodes/links`）；执行格式用于导出，不支持反向还原布局；
+- `shader/Texture` 的贴图通过工具条「贴图」上传并写回第一个 Texture 节点，暂不支持拖拽到指定节点；
+- Surface 的兜底常量在上游连线时被覆盖，Inspector 会显示来源节点；
+- Firefox 的 SSAO 未做能力检测降级；
+- 构建产物约 1.5 MB（three 全量），尚未分包；
+- glTF 动画、骨骼、多材质槽仍属 Out of Scope。
 
 ## LiteGraph 0.17.2 API 核实记录
 
@@ -171,45 +197,66 @@ src/
 ├── graph/                      # 图引擎层（与 UI 解耦）
 │   ├── types.ts                # 节点/连线/Widget/视口快照类型
 │   ├── store.ts                # Zustand 镜像状态（视口 rAF 合并）
-│   ├── actions.ts              # 图操作入口（添加节点、Widget、撤销重做、导入导出）
+│   ├── actions.ts              # 图操作入口（含 focusNode 错误定位）
 │   ├── geometry.ts             # 复用 LiteGraph 常量的尺寸配置
 │   ├── EditorNode.ts           # 节点基类（包围盒与 React DOM 对齐）
-│   ├── nodeRegistry.ts         # 节点定义、注册、节点库检索
+│   ├── nodeDefinitions.ts      # 节点定义纯数据（不依赖 LiteGraph）
+│   ├── nodeRegistry.ts         # 定义注册为 LiteGraph 节点类型
 │   ├── portTypes.ts            # 端口调色板与纯函数连接校验
 │   ├── typeSystem.ts           # 把校验与配色接到 LiteGraph
-│   ├── workflow.ts             # 双格式模型、三级校验、toPromptAPI（纯函数）
+│   ├── workflow.ts             # 双格式模型、三级校验、schema v1→v2 迁移
 │   ├── serialize.ts            # LGraph ↔ UI 工作流往返
+│   ├── coords.ts               # 坐标换算唯一入口
 │   ├── history.ts              # 快照历史栈（上限/合并窗口）
 │   ├── persistence.ts          # localStorage 读写
 │   ├── uiStore.ts              # 主题状态与持久化
-│   ├── samples.ts              # 示例工作流（5 节点 6 连线）
+│   ├── samples.ts              # 示例工作流（ComfyUI + 3D/Shader）
 │   ├── toastStore.ts           # 轻量提示状态
 │   ├── connectionFeedback.ts   # 连接被拒原因记录（类型/环路）
 │   ├── seed.ts                 # 初始示例图
-│   ├── useLiteGraphBridge.ts   # 核心桥接：生命周期 + 同步 + 历史/持久化
+│   ├── useLiteGraphBridge.ts   # 桥接：同步 + 历史/持久化 + 编译失效
 │   ├── measure.ts              # 几何对齐与原生绘制测量
 │   └── debug.ts                # 开发期 window.__graphDebug
 ├── components/
-│   ├── HeaderActions.tsx       # 撤销/重做、导入导出、主题切换
+│   ├── HeaderActions.tsx       # 撤销/重做、导入导出、示例与主题
 │   ├── GraphCanvas.tsx         # 画布容器（挂载桥接层、处理拖拽添加）
-│   ├── NodeLibrary.tsx         # 节点库侧栏（分类 + 搜索 + 点击/拖拽）
-│   ├── NodeOverlay.tsx         # React 节点覆盖层（含 LOD）
+│   ├── NodeLibrary.tsx         # 节点库（分类 + 搜索 + 点击/拖拽）
+│   ├── NodeOverlay.tsx         # React 节点覆盖层（含 LOD 与错误标红）
 │   ├── NodeView.tsx            # 单节点 DOM（标题 / 端口 / Widget）
 │   ├── Widget.tsx              # Widget 控件与回写
-│   ├── SelectionBox.tsx        # 框选提示框（React 绘制，位于节点之上）
-│   ├── MiniMap.tsx             # 迷你地图（点击导航）
-│   ├── SidePanel.tsx           # 右侧面板（检查器 / 开发验证页签）
-│   ├── InspectorPanel.tsx      # 选中节点详情与参数
-│   ├── Toast.tsx               # 连接被拒 / 导入结果提示
-│   ├── StatusBar.tsx           # 节点/连线/选中/缩放
-│   └── DevPanel.tsx            # 开发验证面板（仅 DEV）
+│   ├── SelectionBox.tsx        # 框选提示框
+│   ├── MiniMap.tsx             # 迷你地图
+│   ├── ViewerDock.tsx          # 左栏 3D + 节点库、glTF/贴图上传
+│   ├── SidePanel.tsx           # 右侧面板（检查器 / 开发验证）
+│   ├── InspectorPanel.tsx      # 选中节点详情与专用表单分发
+│   ├── inspector/              # 场景概览、Surface / Environment / PostFX 表单
+│   ├── Toast.tsx / StatusBar.tsx / DevPanel.tsx
+├── shader/                     # 编译器（纯函数，不 import three）
+│   ├── compiler.ts             # 编译入口 / refreshProgram / CompileError
+│   ├── signature.ts            # 结构签名
+│   ├── topology.ts             # 可达性 + 拓扑排序
+│   ├── useProgramStore.ts      # 扁平编译状态
+│   ├── invalidateProgram.ts    # 120ms 防抖 + version token
+│   ├── emitters/               # 节点类型 → GLSL 片段
+│   └── glsl/chunks.ts          # UV varying 与 Unlit 模板
+├── viewer/                     # R3F 渲染层
+│   ├── Viewport3D.tsx / SceneRoot.tsx / Lights.tsx
+│   ├── ModelAsset.tsx / material.ts / assets.ts
+│   └── useViewerStore.ts / requestFrame.ts / contextLoss.ts
+├── postfx/                     # 后处理链
+│   ├── chain.ts                # Output 逆序收集
+│   └── PostFXStack.tsx         # EffectComposer
+├── perf/                       # 性能采样
+│   └── PerfProbe.tsx / usePerfStore.ts / PerfHUD.tsx
 examples/
-└── text-to-image.workflow.json # 示例工作流（可直接导入）
+├── text-to-image.workflow.json # ComfyUI 示例
+└── shader-demo.workflow.json   # 3D / Shader 示例
 scripts/
 ├── verify-canvas.mjs           # 画布交互逐项回归（63 项）
-└── verify-acceptance.mjs       # 阶段 5 全流程验收（18 项）
+├── verify-acceptance.mjs       # 阶段 5 全流程验收（19 项）
+└── verify-3d.mjs               # 3D / Shader 验收（33 项）
 ```
 
 ## 后续阶段
 
-阶段 0–5 已完成。后续可选方向：节点折叠/静音/旁路 UI、组（Group）渲染与导出、执行格式反向导入、执行状态与后端联调。
+阶段 0–5 与 3D/Shader 扩展已完成。后续可选方向：节点复制粘贴、画布内搜索定位、节点库分组折叠、自动布局、Group 渲染与导出、three 分包、编译 Worker 化、执行格式反向导入与后端联调。

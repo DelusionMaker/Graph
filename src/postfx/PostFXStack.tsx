@@ -28,10 +28,10 @@ function renderEffect(item: PostFXDescriptor): ReactElement | null {
           samples={numberParam(params.samples, 16)}
           radius={numberParam(params.radius, 0.1)}
           intensity={numberParam(params.intensity, 1)}
-          worldDistanceThreshold={0.5}
-          worldDistanceFalloff={0.1}
-          worldProximityThreshold={0.5}
-          worldProximityFalloff={0.1}
+          worldDistanceThreshold={numberParam(params.worldDistanceThreshold, 0.5)}
+          worldDistanceFalloff={numberParam(params.worldDistanceFalloff, 0.1)}
+          worldProximityThreshold={numberParam(params.worldProximityThreshold, 0.5)}
+          worldProximityFalloff={numberParam(params.worldProximityFalloff, 0.1)}
         />
       )
     case 'Vignette':

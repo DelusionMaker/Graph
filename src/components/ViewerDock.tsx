@@ -8,7 +8,7 @@ import {
 import { useGraphActions } from '../graph/actions'
 import { useGraphStore } from '../graph/store'
 import { useToastStore } from '../graph/toastStore'
-import { createModelUrl, registerAsset } from '../viewer/assets'
+import { createModelUrl, loadTexture, registerAsset } from '../viewer/assets'
 import { useViewerStore } from '../viewer/useViewerStore'
 import { Viewport3D } from '../viewer/Viewport3D'
 
@@ -50,6 +50,7 @@ export function ViewerDock({ children }: { children: ReactNode }) {
   const setWidgetValue = useGraphActions((state) => state.setWidgetValue)
   const dockRef = useRef<HTMLElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const textureRef = useRef<HTMLInputElement>(null)
 
   const handleSeparatorDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     const dock = dockRef.current
@@ -77,6 +78,34 @@ export function ViewerDock({ children }: { children: ReactNode }) {
     if (!meshNode) return
     const shapeIndex = meshNode.widgets.findIndex((widget) => widget.name === 'shape')
     if (shapeIndex >= 0) setWidgetValue(meshNode.id, shapeIndex, value)
+  }
+
+  const handleTexture = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    const textureNode = nodes.find((node) => node.type === 'shader/Texture')
+    if (!textureNode) {
+      useToastStore.getState().show('请先添加 shader/Texture 节点', 'error')
+      return
+    }
+
+    const assetIndex = textureNode.widgets.findIndex((widget) => widget.name === 'assetId')
+    const wrapValue = String(
+      textureNode.widgets.find((widget) => widget.name === 'wrap')?.value ?? 'repeat',
+    )
+    const wrap = wrapValue === 'clamp' ? 'clamp' : wrapValue === 'mirror' ? 'mirror' : 'repeat'
+    const flipY = textureNode.widgets.find((widget) => widget.name === 'flipY')?.value !== false
+
+    const assetId = `tex-${Date.now()}`
+    try {
+      await loadTexture(assetId, file, { wrap, flipY })
+      if (assetIndex >= 0) setWidgetValue(textureNode.id, assetIndex, assetId)
+      useToastStore.getState().show('贴图已应用到 shader/Texture', 'info')
+    } catch {
+      useToastStore.getState().show('贴图加载失败', 'error')
+    }
   }
 
   const handleFile = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -134,6 +163,13 @@ export function ViewerDock({ children }: { children: ReactNode }) {
             >
               glTF
             </button>
+            <button
+              type="button"
+              title="上传贴图到 shader/Texture 节点"
+              onClick={() => textureRef.current?.click()}
+            >
+              贴图
+            </button>
           </div>
           <label className="viewer-perf-toggle" title="持续渲染并采样帧统计">
             <input
@@ -158,6 +194,7 @@ export function ViewerDock({ children }: { children: ReactNode }) {
             hidden
             onChange={handleFile}
           />
+          <input ref={textureRef} type="file" accept="image/*" hidden onChange={handleTexture} />
         </div>
         <Viewport3D />
       </div>

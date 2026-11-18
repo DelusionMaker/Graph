@@ -183,6 +183,43 @@ describe('compileWorkflow', () => {
     expect(program.warnings.some((warning) => warning.includes('scene/Root'))).toBe(true)
   })
 
+  it('Surface 未连线时使用节点上的兜底常量', () => {
+    const workflow = makeWorkflow(
+      [
+        makeNode(1, 'scene/Root'),
+        makeNode(2, 'material/Surface', ['pbr', '#00ff00', 0.8, 0.1, '#000000']),
+      ],
+      [[1, 2, 0, 1, 1, 'MATERIAL']],
+    )
+    const program = compileWorkflow(workflow)
+    expect(program.injection.color).toContain('u_2_baseColor')
+    expect(program.injection.roughness).toContain('u_2_roughness')
+    expect(program.uniforms.u_2_roughness.value).toBe(0.8)
+    expect(program.uniforms.u_2_metalness.value).toBe(0.1)
+    expect(program.uniforms.u_2_baseColor.value).toHaveLength(3)
+  })
+
+  it('Surface 兜底常量变化只刷新 uniform', () => {
+    const workflow = makeWorkflow(
+      [
+        makeNode(1, 'scene/Root'),
+        makeNode(2, 'material/Surface', ['pbr', '#00ff00', 0.8, 0.1, '#000000']),
+      ],
+      [[1, 2, 0, 1, 1, 'MATERIAL']],
+    )
+    const program = compileWorkflow(workflow)
+    const changed: WorkflowUI = {
+      ...workflow,
+      nodes: workflow.nodes.map((node) =>
+        node.id === 2 ? { ...node, widgets_values: ['pbr', '#ff0000', 0.2, 0.1, '#000000'] } : node,
+      ),
+    }
+    expect(computeSignature(changed)).toBe(program.hash)
+    const refreshed = refreshProgram(changed, program)
+    expect(refreshed.uniforms.u_2_roughness.value).toBe(0.2)
+    expect(refreshed.hash).toBe(program.hash)
+  })
+
   it('Texture 缺少 assetId 时报错', () => {
     const workflow = makeWorkflow(
       [

@@ -1,4 +1,15 @@
-import { DataTexture, type Material, type Mesh, type Object3D, type Texture } from 'three'
+import {
+  ClampToEdgeWrapping,
+  DataTexture,
+  MirroredRepeatWrapping,
+  RepeatWrapping,
+  SRGBColorSpace,
+  TextureLoader,
+  type Material,
+  type Mesh,
+  type Object3D,
+  type Texture,
+} from 'three'
 
 /** 本模块创建、需要显式回收的 blob URL */
 const modelUrls = new Set<string>()
@@ -47,11 +58,64 @@ export function revokeAsset(id: string): void {
   assetUrls.delete(id)
 }
 
-/** 注册纹理资源（后续纹理上传 UI 使用） */
+/** 注册纹理资源 */
 export function registerTexture(id: string, texture: Texture): void {
   const previous = textures.get(id)
   if (previous && previous !== texture) previous.dispose()
   textures.set(id, texture)
+}
+
+/** 把节点的 wrap / flipY 设置应用到纹理 */
+export function applyTextureSettings(
+  texture: Texture,
+  wrap: 'repeat' | 'clamp' | 'mirror',
+  flipY: boolean,
+): void {
+  const mode =
+    wrap === 'clamp'
+      ? ClampToEdgeWrapping
+      : wrap === 'mirror'
+        ? MirroredRepeatWrapping
+        : RepeatWrapping
+
+  if (texture.wrapS !== mode) {
+    texture.wrapS = mode
+    texture.needsUpdate = true
+  }
+  if (texture.wrapT !== mode) {
+    texture.wrapT = mode
+    texture.needsUpdate = true
+  }
+  if (texture.flipY !== flipY) {
+    texture.flipY = flipY
+    texture.needsUpdate = true
+  }
+}
+
+/** 从本地图片创建纹理并注册到 assetId */
+export function loadTexture(
+  id: string,
+  file: File,
+  options: { wrap: 'repeat' | 'clamp' | 'mirror'; flipY: boolean },
+): Promise<Texture> {
+  const url = URL.createObjectURL(file)
+  return new Promise((resolve, reject) => {
+    new TextureLoader().load(
+      url,
+      (texture) => {
+        texture.colorSpace = SRGBColorSpace
+        applyTextureSettings(texture, options.wrap, options.flipY)
+        registerTexture(id, texture)
+        URL.revokeObjectURL(url)
+        resolve(texture)
+      },
+      undefined,
+      (error) => {
+        URL.revokeObjectURL(url)
+        reject(error instanceof Error ? error : new Error('纹理加载失败'))
+      },
+    )
+  })
 }
 
 /** 纹理未加载时回退到 1×1 白色贴图，不阻断渲染 */

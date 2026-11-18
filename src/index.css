@@ -724,6 +724,24 @@ body.is-resizing-dock {
   white-space: pre-wrap;
 }
 
+.inspector-error-link {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--error);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  white-space: pre-wrap;
+  cursor: pointer;
+}
+
+.inspector-error-link:hover {
+  text-decoration: underline;
+}
+
 .inspector-inputs {
   display: flex;
   flex-direction: column;

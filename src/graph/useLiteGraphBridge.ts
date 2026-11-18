@@ -527,6 +527,15 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
       syncViewport()
     }
 
+    const focusNode = (nodeId: number) => {
+      const node = graph.getNodeById(nodeId)
+      if (!node) return
+      canvas.selectItems([node])
+      centerOn(node.pos[0] + node.size[0] / 2, node.pos[1] + node.size[1] / 2)
+      canvas.setDirty(true, true)
+      scheduleSync()
+    }
+
     const fitView = () => {
       if (!graph.nodes.length) return
       const rect = element.getBoundingClientRect()
@@ -579,6 +588,7 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
       addNode,
       setWidgetValue,
       centerOn,
+      focusNode,
       fitView,
       undo,
       redo,

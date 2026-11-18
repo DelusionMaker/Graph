@@ -1,0 +1,114 @@
+{
+  "last_node_id": 7,
+  "last_link_id": 5,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "scene/Mesh",
+      "title": "Mesh",
+      "pos": [40, 40],
+      "size": [220, 140],
+      "mode": 0,
+      "inputs": [],
+      "outputs": [{ "name": "geometry", "type": "GEOMETRY", "links": [1] }],
+      "widgets_values": ["sphere", "", 1],
+      "widget_names": ["shape", "assetId", "scale"]
+    },
+    {
+      "id": 2,
+      "type": "scene/Root",
+      "title": "Scene Root",
+      "pos": [700, 40],
+      "size": [200, 80],
+      "mode": 0,
+      "inputs": [
+        { "name": "geometry", "type": "GEOMETRY", "link": 1 },
+        { "name": "material", "type": "MATERIAL", "link": 4 }
+      ],
+      "outputs": [],
+      "widgets_values": [],
+      "widget_names": []
+    },
+    {
+      "id": 3,
+      "type": "shader/Color",
+      "title": "Color",
+      "pos": [40, 260],
+      "size": [180, 90],
+      "mode": 0,
+      "inputs": [],
+      "outputs": [{ "name": "color", "type": "COLOR", "links": [2] }],
+      "widgets_values": ["#ff8a5c"],
+      "widget_names": ["value"]
+    },
+    {
+      "id": 4,
+      "type": "material/Surface",
+      "title": "Surface 材质",
+      "pos": [340, 240],
+      "size": [220, 250],
+      "mode": 0,
+      "inputs": [
+        { "name": "baseColor", "type": "COLOR", "link": 2 },
+        { "name": "roughness", "type": "FLOAT", "link": 3 },
+        { "name": "metalness", "type": "FLOAT", "link": null },
+        { "name": "emissive", "type": "COLOR", "link": null }
+      ],
+      "outputs": [{ "name": "material", "type": "MATERIAL", "links": [4] }],
+      "widgets_values": ["pbr", "#ff8a5c", 0.35, 0.2, "#000000"],
+      "widget_names": ["shading", "baseColor", "roughness", "metalness", "emissive"]
+    },
+    {
+      "id": 5,
+      "type": "shader/Float",
+      "title": "Float",
+      "pos": [40, 500],
+      "size": [160, 90],
+      "mode": 0,
+      "inputs": [],
+      "outputs": [{ "name": "value", "type": "FLOAT", "links": [3] }],
+      "widgets_values": [0.35],
+      "widget_names": ["value"]
+    },
+    {
+      "id": 6,
+      "type": "postfx/Bloom",
+      "title": "Bloom",
+      "pos": [700, 240],
+      "size": [210, 140],
+      "mode": 0,
+      "inputs": [{ "name": "in", "type": "POSTFX", "link": null }],
+      "outputs": [{ "name": "out", "type": "POSTFX", "links": [5] }],
+      "widgets_values": [1.1, 0.25, true],
+      "widget_names": ["intensity", "luminanceThreshold", "mipmapBlur"]
+    },
+    {
+      "id": 7,
+      "type": "postfx/Output",
+      "title": "PostFX Output",
+      "pos": [960, 240],
+      "size": [190, 70],
+      "mode": 0,
+      "inputs": [{ "name": "effects", "type": "POSTFX", "link": 5 }],
+      "outputs": [],
+      "widgets_values": [],
+      "widget_names": []
+    }
+  ],
+  "links": [
+    [1, 1, 0, 2, 0, "GEOMETRY"],
+    [2, 3, 0, 4, 0, "COLOR"],
+    [3, 5, 0, 4, 1, "FLOAT"],
+    [4, 4, 0, 2, 1, "MATERIAL"],
+    [5, 6, 0, 7, 0, "POSTFX"]
+  ],
+  "groups": [],
+  "config": {
+    "schema_version": 2,
+    "shader_extension": {
+      "viewer": {
+        "camera": { "position": [3, 2.4, 4.2], "target": [0, 0, 0] }
+      }
+    }
+  }
+}

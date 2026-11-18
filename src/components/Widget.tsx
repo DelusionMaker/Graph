@@ -4,16 +4,18 @@ import type { WidgetSnapshot } from '../graph/types'
 interface Props {
   nodeId: number
   widget: WidgetSnapshot
+  /** Inspector 里可显示中文标签；画布节点上仍用原始 widget 名 */
+  label?: string
 }
 
-export function Widget({ nodeId, widget }: Props) {
+export function Widget({ nodeId, widget, label }: Props) {
   const setWidgetValue = useGraphActions((state) => state.setWidgetValue)
   const update = (value: unknown) => setWidgetValue(nodeId, widget.index, value)
 
   return (
     <div className="graph-widget" data-widget-name={widget.name}>
       <span className="graph-widget-label" title={widget.name}>
-        {widget.name}
+        {label ?? widget.name}
       </span>
       <WidgetControl widget={widget} onChange={update} />
     </div>

@@ -1,8 +1,9 @@
 import { useRef } from 'react'
 import { useGraphActions } from '../graph/actions'
-import { SAMPLE_WORKFLOW } from '../graph/samples'
+import { SAMPLE_WORKFLOW, SHADER_DEMO_WORKFLOW } from '../graph/samples'
 import { useToastStore } from '../graph/toastStore'
 import { useUiStore } from '../graph/uiStore'
+import type { WorkflowUI } from '../graph/workflow'
 
 function downloadJson(filename: string, data: unknown): void {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -27,6 +28,12 @@ export function HeaderActions() {
   const theme = useUiStore((state) => state.theme)
   const toggleTheme = useUiStore((state) => state.toggleTheme)
   const showToast = useToastStore((state) => state.show)
+
+  const loadSample = (workflow: WorkflowUI, label: string) => {
+    const result = importWorkflow(workflow)
+    if (result.ok) fitView()
+    showToast(result.ok ? label : '示例工作流加载失败', result.ok ? 'info' : 'error')
+  }
 
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -77,15 +84,11 @@ export function HeaderActions() {
       >
         导出执行格式
       </button>
-      <button
-        type="button"
-        onClick={() => {
-          const result = importWorkflow(SAMPLE_WORKFLOW)
-          if (result.ok) fitView()
-          showToast(result.ok ? '已载入示例工作流' : '示例工作流加载失败', result.ok ? 'info' : 'error')
-        }}
-      >
+      <button type="button" onClick={() => loadSample(SAMPLE_WORKFLOW, '已载入示例工作流')}>
         载入示例
+      </button>
+      <button type="button" onClick={() => loadSample(SHADER_DEMO_WORKFLOW, '已载入 3D 示例')}>
+        载入 3D 示例
       </button>
       <button type="button" onClick={() => fileRef.current?.click()}>
         导入

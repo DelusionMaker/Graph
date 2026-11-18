@@ -1,4 +1,5 @@
 import type { EmitContext, EmitResult } from './index'
+import { parseColor, readNumber } from './values'
 
 /** 把上游结果降维成 float 表达式（VEC3/COLOR 取 x，VEC2 取 x） */
 function asFloat(expr: string, type: string): string {
@@ -13,6 +14,29 @@ function asVec3(expr: string, type: string): string {
   return expr
 }
 
+/** 未连线时的兜底：把 widget 常量注册成 uniform，改值不触发重编译 */
+function fallbackFloat(ctx: EmitContext, name: string, fallback: number): string {
+  const value = readNumber(ctx.widget(name), fallback)
+  return ctx.uniform(name, 'float', value, {
+    nodeId: ctx.nodeId,
+    widgets: [name],
+    kind: 'float',
+  })
+}
+
+function fallbackColor(
+  ctx: EmitContext,
+  name: string,
+  fallback: [number, number, number],
+): string {
+  const value = parseColor(ctx.widget(name), fallback)
+  return ctx.uniform(name, 'color', value, {
+    nodeId: ctx.nodeId,
+    widgets: [name],
+    kind: 'color',
+  })
+}
+
 export function emitSurface(ctx: EmitContext): EmitResult {
   const shading = String(ctx.widget('shading') ?? 'pbr') === 'unlit' ? 'unlit' : 'pbr'
 
@@ -21,10 +45,19 @@ export function emitSurface(ctx: EmitContext): EmitResult {
   const metalnessInput = ctx.input('metalness')
   const emissiveInput = ctx.input('emissive')
 
-  const color = colorInput ? asVec3(colorInput.expr, colorInput.type) : 'vec3(0.55, 0.61, 1.0)'
-  const roughness = roughnessInput ? asFloat(roughnessInput.expr, roughnessInput.type) : '0.5'
-  const metalness = metalnessInput ? asFloat(metalnessInput.expr, metalnessInput.type) : '0.0'
-  const emissive = emissiveInput ? asVec3(emissiveInput.expr, emissiveInput.type) : 'vec3(0.0)'
+  // 有连线时以上游为准，未连线时使用节点上的兜底常量
+  const color = colorInput
+    ? asVec3(colorInput.expr, colorInput.type)
+    : fallbackColor(ctx, 'baseColor', [0.55, 0.61, 1.0])
+  const roughness = roughnessInput
+    ? asFloat(roughnessInput.expr, roughnessInput.type)
+    : fallbackFloat(ctx, 'roughness', 0.5)
+  const metalness = metalnessInput
+    ? asFloat(metalnessInput.expr, metalnessInput.type)
+    : fallbackFloat(ctx, 'metalness', 0.2)
+  const emissive = emissiveInput
+    ? asVec3(emissiveInput.expr, emissiveInput.type)
+    : fallbackColor(ctx, 'emissive', [0, 0, 0])
 
   return {
     expr: '',

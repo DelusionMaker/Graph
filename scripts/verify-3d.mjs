@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 
 const url = process.env.CANVAS_URL ?? 'http://127.0.0.1:5173'
+const WHITE_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
 const checks = []
 
 function check(name, ok, detail = '') {
@@ -219,6 +222,17 @@ check(
   `${uniformBefore} → ${state.uniforms.u_5_value?.value}`,
 )
 
+// ---------- Surface 兜底常量 ----------
+// metalness 未连线，应使用节点上的兜底 widget
+await editWidget(4, 'metalness', 0.7)
+state = await programState()
+check(
+  'Surface 兜底常量生效',
+  state.uniforms.u_4_metalness?.value === 0.7,
+  JSON.stringify(state.uniforms.u_4_metalness?.value),
+)
+check('Surface 兜底不重编译', state.hash === hashBefore, state.hash)
+
 // ---------- A6 Environment ----------
 await editWidget(6, 'shadowEnabled', false)
 state = await programState()
@@ -265,6 +279,13 @@ const errorNodeCount = await page.locator('.graph-node[data-node-id="21"].is-err
 check('A10 出错节点标红', errorNodeCount === 1)
 check('A10 视口保留上一次产物', state.hash === goodHash, `${goodHash} → ${state.hash}`)
 
+// 点击错误条目应定位并选中出错节点
+await deselect()
+await page.locator('.inspector-error-link').first().click()
+await page.waitForTimeout(400)
+const selectedErrorNode = await page.locator('.graph-node[data-node-id="21"].is-selected').count()
+check('A10 错误可点击定位节点', selectedErrorNode === 1, String(selectedErrorNode))
+
 // ---------- A11 导出导入往返 ----------
 await importWorkflow(buildWorkflow({ postfx: ['Bloom', 'Vignette'] }))
 await deselect()
@@ -281,8 +302,66 @@ check(
   `${exported.nodes.length} 节点 / ${exported.links.length} 连线 / schema ${reexported.config.schema_version}`,
 )
 
+// ---------- 纹理上传 ----------
+const textureWorkflow = {
+  last_node_id: 4,
+  last_link_id: 3,
+  nodes: [
+    makeNode(1, 'scene/Mesh', [40, 40], [220, 140], [], [{ name: 'geometry', type: 'GEOMETRY', links: [1] }], ['box', '', 1]),
+    makeNode(2, 'scene/Root', [700, 40], [200, 80], [
+      { name: 'geometry', type: 'GEOMETRY', link: 1 },
+      { name: 'material', type: 'MATERIAL', link: 3 },
+    ], [], []),
+    makeNode(3, 'shader/Texture', [40, 260], [200, 150], [{ name: 'uv', type: 'VEC2', link: null }], [{ name: 'color', type: 'COLOR', links: [2] }], ['', 'repeat', true]),
+    makeNode(4, 'material/Surface', [340, 240], [220, 250], [
+      { name: 'baseColor', type: 'COLOR', link: 2 },
+      { name: 'roughness', type: 'FLOAT', link: null },
+      { name: 'metalness', type: 'FLOAT', link: null },
+      { name: 'emissive', type: 'COLOR', link: null },
+    ], [{ name: 'material', type: 'MATERIAL', links: [3] }], ['pbr', '#ffffff', 0.5, 0.1, '#000000']),
+  ],
+  links: [
+    [1, 1, 0, 2, 0, 'GEOMETRY'],
+    [2, 3, 0, 4, 0, 'COLOR'],
+    [3, 4, 0, 2, 1, 'MATERIAL'],
+  ],
+  groups: [],
+  config: { schema_version: 2 },
+}
+
+await importWorkflow(textureWorkflow)
+const beforeTexture = await programState()
+check('纹理缺失时编译报错', beforeTexture.status === 'error', beforeTexture.status)
+
+await page.locator('.viewer-toolbar input[accept="image/*"]').setInputFiles({
+  name: 'white.png',
+  mimeType: 'image/png',
+  buffer: Buffer.from(WHITE_PNG_BASE64, 'base64'),
+})
+await page.waitForTimeout(1300)
+const afterTexture = await programState()
+const textureUniform = Object.values(afterTexture.uniforms).find((item) => item.type === 'texture')
+check('纹理上传后编译成功', afterTexture.status === 'ready', afterTexture.status)
+check(
+  '纹理写入 uniform',
+  Boolean(textureUniform && String(textureUniform.value).startsWith('tex-')),
+  JSON.stringify(textureUniform?.value),
+)
+
+// ---------- 示例工作流 ----------
+const shaderDemo = JSON.parse(
+  readFileSync(new URL('../examples/shader-demo.workflow.json', import.meta.url), 'utf8'),
+)
+await importWorkflow(shaderDemo)
+state = await programState()
+check(
+  '示例：3D 示例可导入',
+  state.mesh?.shape === 'sphere' && JSON.stringify(state.postfx) === JSON.stringify(['Bloom']),
+  `${state.mesh?.shape} / ${state.postfx.join('>')}`,
+)
+
 // ---------- A3 glTF 上传与无效文件拦截 ----------
-await page.locator('.viewer-toolbar input[type="file"]').setInputFiles({
+await page.locator('.viewer-toolbar input[accept*="gltf"]').setInputFiles({
   name: 'triangle.glb',
   mimeType: 'model/gltf-binary',
   buffer: buildMinimalGlb(),
@@ -297,7 +376,7 @@ check(
 check('A3 有效 glTF 无未捕获异常', pageErrors.length === 0, pageErrors.join(' | ') || '0')
 
 const assetBeforeInvalid = afterValidGltf.mesh?.assetId
-await page.locator('.viewer-toolbar input[type="file"]').setInputFiles({
+await page.locator('.viewer-toolbar input[accept*="gltf"]').setInputFiles({
   name: 'broken.glb',
   mimeType: 'model/gltf-binary',
   buffer: Buffer.from('not-a-glb'),
