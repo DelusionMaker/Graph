@@ -1,8 +1,9 @@
 # React + LiteGraph 节点面板复刻项目规划
 
-> **版本**：v1.0  
+> **版本**：v1.2（按 LiteGraph 0.17.2 类型定义校准）  
 > **日期**：2026-11-18  
 > **状态**：待评审  
+> **修订要点**：v1.1 基于通用 LiteGraph 知识修订，v1.2 依据 `@comfyorg/litegraph@0.17.2` 的 `.d.ts` 与可编译 Spike 回正两处 API（`LGraphCanvas` 构造仍为 options 对象、`addWidget` 仍为位置参数）；锁定版本；明确事件归属与端口几何一致性；修正 `toPromptAPI` 覆盖缺陷与 id 类型；补充导入校验、阶段 0 量化验证清单与测试策略。
 > **定位**：在 Web 端复刻 ComfyUI 风格的可视化节点编辑器，以 React 构建 UI 层、LiteGraph.js 作为节点图引擎。
 
 ---
@@ -24,6 +25,7 @@
 | 状态管理 | 选择集、撤销/重做、图持久化（localStorage） |
 | 类型系统 | 端口类型校验、类型颜色编码、非法连接拦截 |
 | 视觉 | 亮/暗主题、响应式侧栏、节点端口高亮 |
+| 快捷键 | v1 仅实现撤销/重做、删除、保存等少数高频键（见 2.3）；**完整快捷键框架与命令面板属 v2** |
 
 ### 1.3 范围外（Out of Scope）
 
@@ -37,7 +39,7 @@
 
 1. 熟悉 ComfyUI 的用户可在 **5 分钟内**完成"添加节点 → 连线 → 调参 → 导出 JSON"全流程。
 2. **100 节点**工作流下，平移/缩放/连线拖拽保持 **≥ 50fps**（桌面 Chrome，中端设备）。
-3. 刷新页面后工作流可完整恢复（节点位置、参数、连线、选择状态）。
+3. 刷新页面后工作流可完整恢复（节点位置、参数、连线、视口）；选择集属会话态，不持久化（见 7.1）。
 
 ---
 
@@ -88,7 +90,7 @@
 |---|---|---|
 | UI 框架 | React 18/19 + TypeScript | 团队既有能力；类型安全对节点端口/数据模型至关重要 |
 | 构建工具 | Vite | 快速 HMR，适合高频 UI 迭代 |
-| 图引擎 | LiteGraph.js（`@comfyorg/litegraph` 或官方 npm 包） | 提供成熟的图模型、画布渲染与交互；ComfyUI 同款 |
+| 图引擎 | `@comfyorg/litegraph@0.17.2`（已锁定；npm 标记 deprecated 但仍为 latest） | 提供成熟的图模型、画布渲染与交互。**风险提示**：LiteGraph 各版本 API 差异显著，所有 API 用法以锁定版本的 `.d.ts` 为准（见 5.1 / 5.4 核实记录），禁止跨版本照抄示例 |
 | 状态管理 | Zustand | 轻量、无 Provider 嵌套、与命令式引擎桥接简单 |
 | 样式 | CSS Modules + CSS 变量（或 Tailwind CSS） | 主题切换友好，避免全局污染 |
 | 图标 | Lucide React | 轻量、Tree-shaking 友好 |
@@ -109,7 +111,11 @@
 - **React 负责**：节点主体 DOM（标题、widget、状态）、全部面板、工具栏、主题。
 - **桥接层负责**：坐标同步（单一视口状态）、事件转发、数据双向绑定。
 
-**关键原则**：**视口状态只有一份**（scale/offset），LiteGraph 的 `ds` 与 React 覆盖层的 CSS `transform` 由同一状态派生，杜绝漂移。
+**三条不可妥协的关键原则**：
+
+1. **视口状态只有一份**（scale/offset）：LiteGraph 的 `ds` 与 React 覆盖层的 CSS `transform` 由同一状态派生，杜绝漂移。视口更新用 `requestAnimationFrame` 合并，避免与 LiteGraph 渲染循环互相触发。
+2. **事件归属唯一**：节点 widget / 标题栏由 React 处理；**端口拖拽连线归 LiteGraph**——端口热区必须 `pointer-events: none` 让事件穿透到 canvas（见 5.1/5.2）；空白处画布交互归 LiteGraph。禁止两边同时响应同一事件。
+3. **几何常量单一来源**：标题栏高度、槽位间距、端口圆点位置等尺寸由共享配置提供，React DOM 与 LiteGraph 内部绘制必须读取同一份常量。节点整体对齐但连线端点偏离端口圆点，是本项目最隐蔽的错位风险。
 
 ---
 
@@ -145,7 +151,7 @@
 |---|---|---|
 | `LiteGraphCanvas` | 创建/销毁 `LGraph` 与 `LGraphCanvas`，绑定原生事件，转发给桥接层 | `graph`, `onViewportChange`, `onGraphChange` |
 | `NodeOverlay` | 根据视口状态渲染所有可见节点，处理节点级事件委托 | `visibleNodes`, `viewport` |
-| `NodeView` | 单个节点的完整 UI，含拖拽手柄与端口热区 | `node`, `selected`, `onMove`, `onPortDown` |
+| `NodeView` | 单个节点的完整 UI，标题栏为拖拽手柄；**端口热区 `pointer-events: none`，连线事件归 LiteGraph** | `node`, `selected`, `onMove`, `onWidgetChange` |
 | `Widget` | 参数控件分发器（text/number/slider/combo/color/boolean） | `schema`, `value`, `onChange` |
 | `useLiteGraphBridge` | **核心 Hook**：LiteGraph ↔ Zustand 双向同步 | 见第 5 节 |
 
@@ -169,20 +175,20 @@ export function LiteGraphCanvas({ onReady }: Props) {
     if (!canvas) return
 
     const graph = new LGraph()
-    const lgraphCanvas = new LGraphCanvas(canvas, graph, {
-      autoresize: true,
-      show_grids: true,
-      render_shadows: false,
-    })
+    // 0.17.2：第三参数是 options 对象，仅支持 skip_events / viewport / skip_render / autoresize
+    const lgraphCanvas = new LGraphCanvas(canvas, graph, { autoresize: true })
 
-    // 关键：关闭 LiteGraph 原生节点绘制，仅保留连线与画布
+    // 视觉配置是实例属性，构造后赋值；0.17.2 没有 show_grids 属性
     lgraphCanvas.render_shadows = false
-    // 通过覆盖 drawNode 的方式跳过节点本体（具体 API 依版本而定）
-    
+
+    // 关闭原生节点绘制：只 arrange() 维持槽位坐标，不画节点本体
+    lgraphCanvas.drawNode = (node) => { node.arrange() }
+
     graphRef.current = graph
     onReady?.({ graph, lgraphCanvas })
 
     return () => {
+      graph.stop()
       lgraphCanvas.clear()
       graph.clear()
       graphRef.current = null
@@ -193,7 +199,12 @@ export function LiteGraphCanvas({ onReady }: Props) {
 }
 ```
 
-> **待验证点**：LiteGraph 不同版本对"只绘制连线、不绘制节点"的支持程度不同。备选方案是让 LiteGraph 绘制节点背景（作为视觉底座），React 节点层透明叠加其上——此时需关闭 React 节点的背景色。此决策应在阶段 1 通过技术 Spike 确定。
+> **阶段 0 必须验证的三个点**：
+> 1. **隐藏原生节点绘制**的可行性。不同版本支持程度不同；备选方案是让 LiteGraph 绘制节点背景（视觉底座），React 节点层透明叠加（关闭 React 节点背景色）。
+> 2. **事件穿透**：React 端口热区设 `pointer-events: none` 后，LiteGraph 能否正常从端口发起连线。若不成立，需切换为 React 全权接管连线（复杂度显著上升），此决策必须在阶段 0 定案。
+> 3. **几何对齐**：连线端点与 React 端口圆心的偏差 < 2px，且标题栏高度 / 槽位间距来自同一份共享常量。
+>
+> 注：原文将此项列为"阶段 1 确定"，实际它是架构可行性的前提，必须前移至阶段 0。
 
 ### 5.2 桥接层设计（核心）
 
@@ -210,14 +221,26 @@ interface GraphState {
   syncFromLiteGraph: (graph: LGraph, canvas: LGraphCanvas) => void
 }
 
+let viewportFrame = 0
+let pendingViewport: Viewport | null = null
+
 export const useGraphStore = create<GraphState>((set, get) => ({
   nodes: [],
   viewport: { x: 0, y: 0, zoom: 1 },
-  setViewport: (v) => set({ viewport: v }),
+  // 视口高频更新用 rAF 合并，避免平移时每帧触发 React commit
+  setViewport: (v) => {
+    pendingViewport = v
+    if (viewportFrame) return
+    viewportFrame = requestAnimationFrame(() => {
+      viewportFrame = 0
+      if (pendingViewport) set({ viewport: pendingViewport })
+      pendingViewport = null
+    })
+  },
   syncFromLiteGraph: (graph, canvas) => {
     const { scale, offset } = canvas.ds
     const nodes = graph.nodes.map(n => ({
-      id: n.id as string,
+      id: n.id as number,
       type: n.type,
       pos: [n.pos[0], n.pos[1]] as [number, number],
       size: [n.size[0], n.size[1]] as [number, number],
@@ -242,12 +265,16 @@ return (
     style={{
       transformOrigin: '0 0',
       transform: `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.zoom})`,
+      // 容器不吃事件，空白区域穿透到 canvas；仅 widget / 标题栏热区开启 auto
+      pointerEvents: 'none',
     }}
   >
     {nodes.map(n => <NodeView key={n.id} node={n} />)}
   </div>
 )
 ```
+
+> **事件分层**（承接 3.3 节原则 2）：`node-overlay` 容器 `pointer-events: none`；`WidgetPanel` / `NodeHeader` 设 `pointer-events: auto` 接收 React 交互；**端口圆点保持 `none`**，让 `mousedown` 穿透到 canvas 由 LiteGraph 发起连线。若端口需要 hover 高亮，由 React 读状态渲染，不拦截事件。
 
 ### 5.3 事件同步表
 
@@ -261,20 +288,28 @@ return (
 | React | 节点标题栏拖拽 | 更新 `node.pos`，`canvas.setDirty(true)` |
 | React | 属性面板编辑 | 同上 |
 
+> 表中 `on*` 均为 `LGraphCanvas` 的实例属性（函数赋值），不是 EventEmitter 事件；具体可用名称须按锁定版本逐项核对。连线合法性校验统一走 `LGraph.isValidConnection`（见 6.3），不要在 React 层重复实现一套。
+>
+> **阶段 0 实测坑**：LiteGraph 在 **capture 阶段**处理 `pointerup` 并调用 `stopPropagation()`，冒泡阶段收不到该事件。桥接层必须在 capture 阶段监听，并用 `requestAnimationFrame` **延后一帧**再同步，否则会出现"连线已建立（`graph.links.size` 为 1）但 React 面板显示 0 条"的假失败。验证脚本见 `scripts/verify-spike.mjs`。
+>
+> **StrictMode**：LiteGraph 的命令式实例不适合 React StrictMode 双挂载（`unbindEvents()` 不会移除全部监听器），本项目不启用 StrictMode。
+
 ### 5.4 节点类型注册
 
 ```ts
-import { LiteGraph } from '@comfyorg/litegraph'
+import { LiteGraph, LGraphNode } from '@comfyorg/litegraph'
 
-LiteGraph.registerNodeType('model/LoadCheckpoint', class LoadCheckpoint {
-  title = 'Load Checkpoint'
-  inputs = []
-  outputs = [
-    { name: 'MODEL', type: 'MODEL' },
-    { name: 'CLIP',  type: 'CLIP' },
-    { name: 'VAE',   type: 'VAE' },
-  ]
-  constructor() {
+// 必须继承 LGraphNode，否则 addWidget / 端口相关方法均不可用
+LiteGraph.registerNodeType('model/LoadCheckpoint', class LoadCheckpoint extends LGraphNode {
+  static slot_start_y = LiteGraph.NODE_TITLE_HEIGHT
+
+  constructor(title: string) {
+    super(title)
+    // 0.17.2 推荐用 addInput / addOutput，而不是类字段数组
+    this.addOutput('MODEL', 'MODEL')
+    this.addOutput('CLIP', 'CLIP')
+    this.addOutput('VAE', 'VAE')
+    // 0.17.2 的 addWidget 仍是位置参数形式（不是对象参数）
     this.addWidget('combo', 'ckpt_name', 'sd15.safetensors', () => {}, {
       values: ['sd15.safetensors', 'sdxl.safetensors'],
     })
@@ -307,7 +342,7 @@ interface WorkflowUI {
 }
 
 interface UINode {
-  id: string
+  id: number                      // 与 LiteGraph node.id / last_node_id 保持一致，避免映射歧义
   type: string                    // 注册类型名，如 'model/LoadCheckpoint'
   title?: string
   pos: [number, number]
@@ -325,13 +360,22 @@ interface PortDef {
   links?: number[]                // 输出（可多连）
 }
 
-// 连线：[link_id, 源节点, 源槽位, 目标节点, 目标槽位, 类型]
-type UILink = [number, string, number, string, number, PortType]
+interface UIGroup {
+  id: number
+  title: string
+  pos: [number, number]
+  size: [number, number]
+  color?: string
+  nodes?: number[]                // 组内节点 id，便于序列化还原
+}
+
+// 连线：[link_id, 源节点 id, 源槽位, 目标节点 id, 目标槽位, 类型]
+type UILink = [number, number, number, number, number, PortType]
 
 // 执行格式
 type PromptAPI = Record<string, {
   class_type: string
-  inputs: Record<string, [string, number] | unknown>
+  inputs: Record<string, unknown> // 连线值为 [nodeId, slot]，字面量直接写值
   _meta?: { title?: string }
 }>
 
@@ -356,6 +400,8 @@ type PortType =
 2. 输出 → 输入的单向约束；
 3. 禁止自环与环（执行阶段需 DAG，前端提前拦截）。
 
+**实现落点**：统一在 `LGraph.isValidConnection(input, output)` 中实现上述三条，环检测用 DFS（注意大图上的性能），非法连接由 LiteGraph 原生拒绝；同时在该回调中触发 React 侧提示。不要在 React 层重复实现一套校验。
+
 ### 6.4 连接关系表示
 
 - **UI 格式**：六元组 + 节点侧双向索引（`input.link` / `output.links`），便于 O(1) 查询与删除清理。
@@ -370,14 +416,23 @@ export function toPromptAPI(ui: WorkflowUI): PromptAPI {
   for (const node of ui.nodes) {
     if (node.mode !== 0) continue                  // 静音/旁路不入执行图
     const inputs: Record<string, unknown> = {}
+    const connected = new Set<string>()
+
     for (const port of node.inputs) {
       if (port.link == null) continue
       const link = linkMap.get(port.link)
-      if (link) inputs[port.name] = [link[1], link[2]]
+      if (link) {
+        inputs[port.name] = [link[1], link[2]]
+        connected.add(port.name)                   // 已连线：禁止 widget 值覆盖
+      }
     }
+
+    // widget 值仅在对应 input 未连线时写入；widgets_values 与 inputs 并非严格一一对应
     node.widgets_values.forEach((v, i) => {
-      inputs[node.inputs[i]?.name ?? `widget_${i}`] = v
+      const name = node.inputs[i]?.name ?? `widget_${i}`
+      if (!connected.has(name)) inputs[name] = v
     })
+
     result[node.id] = { class_type: node.type, inputs }
   }
   return result
@@ -425,7 +480,9 @@ export function toPromptAPI(ui: WorkflowUI): PromptAPI {
 - 自动保存：图变更防抖 **1s** 后写入 `localStorage`（键 `node-editor:workflow:v1`）。
 - 手动导出：下载 `workflow.json`（UI 格式）；支持"导出执行格式"。
 - 导入：校验 JSON 结构 → 重建 `LGraph` → 同步 Zustand。
-- 版本字段：在 `config` 中写入 `schema_version`，便于后续迁移。
+  - **三级校验**：① 结构完整性（必需字段存在且类型正确）；② 引用完整性（`inputs.link` / `outputs.links` 指向的 link 存在且两端节点存在）；③ 类型合法性（端口类型在 `PortType` 联合类型内）。
+  - **失败策略**：① 级失败直接拒绝并提示；② 级失败丢弃悬空连线后导入并警告；③ 级失败按 `*` 通配类型降级并警告。禁止静默导入。
+- 版本字段：在 `config` 中写入 `schema_version`，便于后续迁移；读取时按版本分派迁移函数。
 
 ---
 
@@ -448,6 +505,8 @@ export function toPromptAPI(ui: WorkflowUI): PromptAPI {
 | 选中态 | 2px 主色边框 + 轻微阴影 |
 | 静音态 | 整体透明度 0.6，加斜纹背景 |
 
+> 上表尺寸（标题栏 28px、Widget 行高 24px、端口直径 12px）即为 3.3 节原则 3 所说的**共享几何常量**，必须同时驱动 React DOM 与 LiteGraph 内部槽位计算，不得各写一份。
+
 ### 8.3 缩放与响应式
 
 - 画布缩放范围 **0.2x–3x**，以鼠标位置为中心。
@@ -468,14 +527,24 @@ export function toPromptAPI(ui: WorkflowUI): PromptAPI {
 
 | 阶段 | 周期 | 核心目标 | 关键任务 | 交付物 | 阶段验收 |
 |---|---|---|---|---|---|
-| **0. 技术 Spike** | 第 1 周 | 验证 LiteGraph 与 React 共存可行性 | 搭建 Vite+React+TS；运行最小 LGraph；验证"隐藏原生节点绘制、React 覆盖层同步坐标"；确定集成模式 A/B | 可运行 Spike + 技术决策记录 | 画布平移缩放时，React 节点与连线对齐误差 < 2px |
-| **1. 画布基座** | 第 2–3 周 | 完成画布核心交互 | 初始化封装、视口同步、平移缩放、框选、多节点拖拽、连线创建/删除 | 画布组件 + 桥接层 v1 | 完成第 2.3 节全部画布交互 |
-| **2. 节点系统** | 第 4–5 周 | 节点 UI 与类型系统 | NodeView/Widget 组件、端口渲染、类型校验、节点注册机制、节点库侧栏 | 节点组件库 + 类型注册 API | 可添加 5 种示例节点并正确连线 |
-| **3. 数据与状态** | 第 6–7 周 | 序列化与状态能力 | 双格式模型与转换器、JSON 导入导出、localStorage 持久化、撤销/重做 | 数据层 + 单元测试 | 导出再导入后图完全一致；撤销/重做正确 |
-| **4. 视觉与完善** | 第 8 周 | 产品化打磨 | 主题系统、LOD、迷你地图、检查器面板、响应式、无障碍 | 完整 UI | 主题切换无状态丢失；100 节点 ≥ 50fps |
-| **5. 验收与文档** | 第 9 周 | 交付 | 全流程测试、性能 Profile、README、示例工作流 | 发布版本 + 文档 | 通过第 11 节全部验收标准 |
+| **0. 技术 Spike** | **第 1–2 周** | 验证 LiteGraph 与 React 共存可行性 | 锁定 LiteGraph 版本；搭建 Vite+React+TS；运行最小 LGraph；逐项验证下方"阶段 0 验证清单"；确定集成模式 A/B | 可运行 Spike + 技术决策记录 + 几何常量共享配置 | 三项验证全部通过（见下方清单） |
+| **1. 画布基座** | 第 3–4 周 | 完成画布核心交互 | 初始化封装、视口同步、平移缩放、框选、多节点拖拽、连线创建/删除 | 画布组件 + 桥接层 v1 | 完成第 2.3 节全部画布交互 |
+| **2. 节点系统** | 第 5–6 周 | 节点 UI 与类型系统 | NodeView/Widget 组件、端口渲染、类型校验、节点注册机制、节点库侧栏 | 节点组件库 + 类型注册 API | 可添加 5 种示例节点并正确连线 |
+| **3. 数据与状态** | 第 7–8 周 | 序列化与状态能力 | 双格式模型与转换器、JSON 导入导出、localStorage 持久化、撤销/重做 | 数据层 + 单元测试 | 导出再导入后图完全一致；撤销/重做正确 |
+| **4. 视觉与完善** | 第 9 周 | 产品化打磨 | 主题系统、LOD、迷你地图、检查器面板、响应式、无障碍 | 完整 UI | 主题切换无状态丢失；100 节点 ≥ 50fps |
+| **5. 验收与文档** | 第 10 周 | 交付 | 全流程测试、性能 Profile、README、示例工作流 | 发布版本 + 文档 | 通过第 11 节全部验收标准 |
 
-> 周期为参考估算，按 1 名熟悉 React 的开发者、每周 5 个工作日计。若并行开发或团队规模变化需重新排期。
+> 周期为参考估算，按 1 名熟悉 React 的开发者、每周 5 个工作日计。阶段 0 由 1 周延长至 2 周：事件边界与几何对齐验证是架构可行性的前提，不可压缩；若并行开发或团队规模变化需重新排期。
+
+**阶段 0 验证清单**（三项必须全部通过，任一失败即触发架构回退）：
+
+| # | 验证项 | 方法 | 通过的量化标准 |
+|---|---|---|---|
+| 1 | 隐藏原生节点绘制 | 覆写 `drawNode` 后截图对比 | 画布只剩连线 / 网格，无 LiteGraph 原生节点残影；备选"透明覆盖"方案已就绪 |
+| 2 | 事件穿透与连线 | 从 React 端口圆点按下拖到另一端口 | LiteGraph 正常生成连线、预览线可见；React 端口热区未拦截 `mousedown` |
+| 3 | 几何对齐 | 0.2x / 1x / 3x 三档缩放下截图测量 | 节点整体对齐误差 < 2px；**连线端点与 React 端口圆心偏差 < 2px** |
+
+> 原规划把"隐藏原生节点绘制"列为阶段 1 决策，实际它与事件边界共同决定模式 B 是否成立，必须前移至阶段 0。
 
 ---
 
@@ -483,13 +552,16 @@ export function toPromptAPI(ui: WorkflowUI): PromptAPI {
 
 | 风险 | 概率 | 影响 | 缓解措施 |
 |---|---|---|---|
-| LiteGraph 版本 API 差异，隐藏原生节点绘制困难 | 中 | 高 | 阶段 0 Spike 优先验证；准备"透明覆盖"备选方案（React 节点无背景，LiteGraph 画底座） |
-| 视口坐标不同步导致节点与连线错位 | 中 | 高 | 强制单一视口状态；编写坐标转换单元测试；提供调试可视化 |
-| React 频繁重渲染拖慢画布 | 高 | 中 | 节点组件 `React.memo`；Zustand 细粒度订阅；LOD 低缩放降级 |
-| 拖拽与画布事件冲突（React DOM vs Canvas） | 中 | 中 | 明确事件委托边界：节点拖拽由 React 处理，空白处由 Canvas 处理；`pointer-events` 分层 |
+| LiteGraph 版本 API 差异，隐藏原生节点绘制困难 | 中 | 高 | 阶段 0 **锁定版本后校准全部 API**；Spike 优先验证；准备"透明覆盖"备选方案（React 节点无背景，LiteGraph 画底座） |
+| 视口坐标不同步导致节点与连线错位 | 中 | 高 | 强制单一视口状态；视口更新用 rAF 合并；编写坐标转换单元测试；提供调试可视化 |
+| React 频繁重渲染拖慢画布 | 高 | 中 | 节点组件 `React.memo`；Zustand 细粒度订阅；视口 transform 只作用于 overlay 容器、不下传到 NodeView；LOD 低缩放降级 |
+| 拖拽与画布事件冲突（React DOM vs Canvas） | 中 | **高** | 明确事件归属：widget / 标题栏归 React，**端口拖拽连线与空白处归 Canvas**；`pointer-events` 分层，见 3.3 / 5.2 |
+| React 镜像状态滞后于 LiteGraph 图状态 | 中 | 中 | `pointerup` 用 capture 阶段监听 + rAF 延后同步；调试时直接读 `graph.links.size` 而非只看 React 镜像 |
+| 拖动节点时 React 节点不跟随、松手瞬移 | 高 | 中 | 原生节点绘制关闭后必须在 `pointermove` 实时同步位置（capture + rAF）；store 用增量更新 + `React.memo(NodeView)` 避免全量重渲染 |
+| React 端口几何与 LiteGraph 内部槽位计算不一致 | 中 | **高** | 标题栏高度 / 槽位间距抽为共享常量，两侧读取同一份；阶段 0 验证连线端点与 React 端口圆心偏差 < 2px |
 | 端口命中测试在缩放后偏移 | 中 | 中 | 统一使用模型坐标做命中计算；缩放变更时重新采样 |
 | localStorage 容量与版本迁移 | 低 | 中 | 限制存储大小；`schema_version` 字段 + 迁移函数 |
-| 执行格式转换器边界情况（widget 与 input 名冲突） | 中 | 低 | 为 widget 生成唯一键；编写覆盖性单元测试 |
+| 执行格式转换器边界情况（widget 与 input 名冲突） | 中 | 低 | 已连线 input 跳过 widget 值写入（见 6.4）；编写覆盖性单元测试 |
 
 ---
 
@@ -509,13 +581,16 @@ export function toPromptAPI(ui: WorkflowUI): PromptAPI {
 - [ ] 100 节点工作流下，平移/缩放帧率 ≥ 50fps（桌面 Chrome，中端设备）。
 - [ ] 添加/删除单节点 UI 响应时间 < 100ms。
 - [ ] 画布与 React 覆盖层在 0.2x–3x 缩放全范围内对齐误差 < 2px。
+- [ ] 连线端点与 React 端口圆心在 0.2x–3x 全范围内偏差 < 2px（几何一致性）。
+- [ ] 拖动节点时 React 节点实时跟随，无松手瞬移或明显滞后。
 
 ### 11.3 兼容性与质量验收
 
 - [ ] Chrome / Edge / Firefox 最新两版本功能一致。
 - [ ] 亮/暗主题切换无状态丢失、无视觉错位。
 - [ ] 1280px 与 1920px 宽度下布局无溢出。
-- [ ] 核心数据转换函数单元测试覆盖率 ≥ 80%。
+- [ ] 核心数据转换函数单元测试覆盖率 ≥ 80%；坐标变换与 `toPromptAPI` 均有单测。
+- [ ] 端口几何对齐至少有一条 E2E 用例（平移 / 缩放后测量端点与圆心偏差）。
 - [ ] 无控制台错误与未处理 Promise rejection。
 
 ---
@@ -526,7 +601,7 @@ export function toPromptAPI(ui: WorkflowUI): PromptAPI {
 - 节点内集成 WebGL/WebGPU 预览（复用共享渲染上下文）。
 - 子图（Subgraph）与节点组复用。
 - 执行状态可视化（节点进度条、缓存命中标记）。
-- 快捷键系统、命令面板（Ctrl+K 搜索节点与命令）。
+- 完整快捷键系统、命令面板（Ctrl+K 搜索节点与命令）——v1 仅保留少数高频键，见 1.2。
 
 ---
 
@@ -545,5 +620,5 @@ export function toPromptAPI(ui: WorkflowUI): PromptAPI {
 ## 附录 B：参考资源
 
 - LiteGraph.js GitHub 仓库与示例
-- ComfyUI 官方文档：Nodes 2.0 架构说明
+- ComfyUI 官方文档：Nodes 2.0 架构说明（**注意**：ComfyUI 新前端已演进到 Vue + 新渲染层；本项目复刻的是 LiteGraph 时代的工作流风格与交互，不追求与新前端技术栈一致）
 - ComfyUI 工作流元数据文档（workflow / prompt 双字段设计）

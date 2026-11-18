@@ -1,0 +1,222 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  background: #1b1b1f;
+  color: #e0e0e0;
+  font-size: 13px;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.app-header {
+  flex: 0 0 48px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  border-bottom: 1px solid #333;
+  background: #232329;
+}
+
+.app-header strong {
+  font-size: 15px;
+}
+
+.app-header span {
+  color: #888;
+}
+
+.app-body {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.spike-panel {
+  flex: 0 0 340px;
+  overflow-y: auto;
+  border-right: 1px solid #333;
+  background: #232329;
+}
+
+.spike-panel-inner {
+  padding: 16px;
+}
+
+.spike-panel h2 {
+  font-size: 16px;
+  margin: 0 0 4px;
+}
+
+.spike-panel h3 {
+  font-size: 13px;
+  margin: 0 0 6px;
+  color: #8ab4f8;
+}
+
+.spike-panel section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #333;
+}
+
+.spike-panel p {
+  margin: 6px 0;
+  line-height: 1.6;
+  color: #bbb;
+}
+
+.spike-panel code {
+  background: #333;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.hint {
+  color: #777 !important;
+  margin-top: 0 !important;
+}
+
+.pass {
+  color: #6dd58c !important;
+  font-weight: bold;
+}
+
+.fail {
+  color: #ff7b72 !important;
+  font-weight: bold;
+}
+
+.pending {
+  color: #e3b341 !important;
+}
+
+.spike-panel button {
+  background: #3a6ea5;
+  color: #fff;
+  border: 0;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.spike-panel button:hover {
+  background: #4a7fb8;
+}
+
+.measure-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.measure-table th,
+.measure-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid #3a3a42;
+  text-align: left;
+}
+
+.measure-table th {
+  color: #888;
+  font-weight: normal;
+}
+
+.stats {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  color: #bbb;
+  line-height: 1.8;
+}
+
+.canvas-area {
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.litegraph-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.node-overlay {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+.spike-node {
+  position: absolute;
+  background: #2b2b33;
+  border: 1px solid #555;
+  border-radius: 5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  overflow: visible;
+}
+
+.spike-node-title {
+  background: #3a3a46;
+  border-radius: 4px 4px 0 0;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  color: #f0f0f0;
+}
+
+.spike-node-id {
+  color: #888;
+  font-weight: normal;
+  font-size: 11px;
+}
+
+.spike-port {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #8ab4f8;
+  border: 1px solid #1b1b1f;
+  pointer-events: none;
+}
+
+.spike-port.is-connected {
+  background: #6dd58c;
+}
+
+.spike-port-label {
+  position: absolute;
+  color: #ddd;
+  font-size: 11px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.spike-port-label.is-output {
+  text-align: right;
+}
