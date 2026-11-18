@@ -1,15 +1,27 @@
 # 3D 预览 · Shader 节点 · 后处理扩展实现指导
 
-> **版本**：v2.0（基于当前代码事实修订；v1.0 的前置假设与目录结构不成立）  
+> **版本**：v3.0（阶段 0–F 已实现；末尾附实现偏差记录）  
 > **日期**：2026-11-18  
 > **定位**：`Ref_React-LiteGraph节点面板项目规划.md` 的独立后续功能扩展说明  
 > **技术栈基线**：React 18 + TypeScript + Vite 6 + Zustand 5 + `@comfyorg/litegraph@0.17.2` + R3F v8 系列  
-> **前置依赖（已核对代码）**：主文档阶段 0–5 已完成（`README.md` 自述）。当前事实：
-> - 桥接层 `src/graph/useLiteGraphBridge.ts`（628 行）驱动 LGraph ↔ `useGraphStore` 镜像；`canvas.ds` 是画布视口唯一真相源。
-> - 节点定义在 `src/graph/nodeRegistry.ts`（5 个 ComfyUI 节点）；端口类型在 `src/graph/workflow.ts` 的 `PORT_TYPES`（14 项）。
-> - 双格式模型 `WorkflowUI` / `PromptAPI`、`parseWorkflow` 三级校验、`toPromptAPI` 已实现；`SCHEMA_VERSION = 1`，`migrateWorkflow` 目前是恒等桩。
-> - **尚未落地**：`screenToGraph` / `invalidate` / `getPortDisplayText` 三项"单一真相源"。坐标转换散落在 4 处，重绘靠 `canvas.setDirty()`，端口标签直接读 `port.name`。
-> - **尚无** three / R3F / shader / postfx / perf 相关代码。
+> **前置依赖（已实现）**：主文档阶段 0–5 已完成（`README.md` 自述）。当前事实：
+> - 桥接层 `src/graph/useLiteGraphBridge.ts` 驱动 LGraph ↔ `useGraphStore` 镜像；`canvas.ds` 是画布视口唯一真相源。
+> - 节点定义拆分为纯数据 `src/graph/nodeDefinitions.ts`（5 个 ComfyUI 节点 + 19 个 shader/postfx 节点），注册在 `nodeRegistry.ts`；端口类型 20 项。
+> - 双格式模型 `WorkflowUI` / `PromptAPI`、`parseWorkflow` 三级校验、`toPromptAPI` 已实现；**`SCHEMA_VERSION = 2`**，`migrateWorkflow` 已实现 v1 → v2。
+> - 已落地：`src/graph/coords.ts` 统一坐标转换；桥接层 `commit()` 串联历史/持久化/`invalidateProgram()`；端口文本继续读 `port.name`（不引入 `getPortDisplayText`）。
+> - 已落地：three 0.169 / R3F 8.18 / drei 9.122 / postprocessing 2.19 / `@types/three` 0.169；3D 视口、编译器、后处理、性能 HUD 均可用。
+
+## 实现进度
+
+| 阶段 | 内容 | 状态 |
+|---|---|---|
+| 0 | 依赖 Spike、`coords.ts` 统一坐标 | 完成 |
+| A | 3D 视口骨架、ViewerDock 布局、glTF 上传 | 完成 |
+| B | 20 个端口类型、19 个新节点、topology、连接校验 | 完成 |
+| C | signature、emitters、PBR/Unlit、compiler、chain、invalidateProgram | 完成 |
+| D | SceneRoot、Lights、PostFXStack、PerfProbe | 完成 |
+| E | SceneOverview、Surface/Environment/PostFX 表单、错误标红 | 完成 |
+| F | contextLoss、schema v2 迁移、测试与验收 | 完成 |
 
 ---
 
@@ -313,22 +325,39 @@ Inspector 的页签状态保留在 `SidePanel.tsx` 组件内部，不新建 stor
 ### 5.1 编译产物
 
 ```ts
+// 实际实现（src/shader/compiler.ts）
 export interface CompiledProgram {
   hash: string                       // signature 的短哈希，用于 ProgramCacheKey
   version: number                    // 每次结构变化 +1
-  // PBR 注入片段
-  injection: {
+  injection: {                       // PBR 注入片段
     color: string                    // 注入 <color_fragment> 之后
     roughness: string                // 注入 <roughnessmap_fragment> 之后
     metalness: string                // 注入 <metalnessmap_fragment> 之后
     emissive: string                 // 注入 <emissivemap_fragment> 之后
   }
-  uniforms: Record<string, { value: unknown }>
-  textureSlots: Array<{ uniform: string; assetId: string }>
+  uniformDeclarations: string[]      // 必须注入 GLSL 顶部的 uniform 声明
+  uniforms: Record<string, UniformValue>
+  uniformSources: Record<string, {   // uniform → widget 来源，用于免重编译刷新
+    nodeId: number
+    widgets: string[]
+    kind: 'float' | 'vec2' | 'vec3' | 'color' | 'time' | 'texture'
+  }>
+  textureSlots: Array<{ uniform: string; assetId: string; wrap: 'repeat' | 'clamp' | 'mirror'; flipY: boolean }>
   environment: EnvironmentSettings
   postfxChain: PostFXDescriptor[]
   shading: 'pbr' | 'unlit'
+  mesh: { shape: 'box' | 'sphere' | 'torusknot' | 'gltf'; assetId: string; scale: number }
+  meshFromNode: boolean              // false 时视口回退到工具条状态
+  activeRootId: number | null
+  activeOutputId: number | null
+  unlit: { vertexShader: string; fragmentShader: string } | null
   warnings: string[]
+}
+
+export interface UniformValue {
+  type: 'float' | 'vec2' | 'vec3' | 'color' | 'time' | 'texture'
+  value: unknown
+  animated?: boolean                 // true 表示逐帧更新（shader/Time）
 }
 
 export interface PostFXDescriptor {
@@ -361,24 +390,40 @@ type GraphSnapshot = WorkflowUI   // 编译器只读，不修改
 
 ### 5.3 节点定义的统一注册结构
 
-扩展既有 `NodeDefinition`（`src/graph/nodeRegistry.ts`），`emit` 是可选字段：
+实际实现把"定义"与"emit"拆开，避免 `graph → shader` 循环依赖：
 
 ```ts
+// src/graph/nodeDefinitions.ts —— 纯数据，不 import LiteGraph / three
+export interface NodeDefinition {
+  type: string
+  title: string
+  category: string
+  description: string
+  inputs: SlotDefinition[]
+  outputs: SlotDefinition[]
+  widgets: WidgetDefinition[]        // 复用既有 WidgetDefinition
+  width?: number
+  codeAffectingWidgets?: string[]
+  terminal?: boolean
+}
+
+// src/shader/emitters/index.ts —— 节点类型 → emit 函数映射
 export interface EmitContext {
-  nodeId: string
-  getInput: (name: string) => EmitResult | null   // 上游递归 emit 结果
-  uniform: (suffix: string, value: unknown) => string  // 返回 uniform 变量名
-  addStatement: (glsl: string) => void
+  nodeId: number
+  widget: (name: string) => unknown
+  input: (name: string) => EmitResult | null
+  uniform: (suffix: string, kind: UniformKind, value: unknown, source: UniformSource) => string
+  texture: (suffix: string, assetId: string, wrap: TextureSlot['wrap'], flipY: boolean) => string
+  declare: (glsl: string) => void
+  warn: (message: string) => void
+  error: (message: string) => never   // 抛 CompileError，终止编译
 }
 
 export interface EmitResult {
   expr: string
   type: PortType
+  surface?: SurfaceEmit                // material/Surface 专用
 }
-
-// NodeDefinition 新增字段
-//   codeAffectingWidgets?: string[]
-//   emit?: (ctx: EmitContext) => EmitResult
 ```
 
 ### 5.4 序列化扩展与版本迁移
@@ -416,13 +461,20 @@ src/
 ├── components/
 │   ├── GraphCanvas.tsx / NodeOverlay.tsx / NodeView.tsx / Widget.tsx   # 既有，小改
 │   ├── NodeLibrary.tsx              # 修改：五分类分组 + 可折叠
-│   ├── SidePanel.tsx / InspectorPanel.tsx  # 修改：ShaderInspector 分发
+│   ├── SidePanel.tsx / InspectorPanel.tsx  # 修改：按节点类型分发表单
 │   ├── HeaderActions.tsx / StatusBar.tsx / Toast.tsx
 │   ├── MiniMap.tsx / SelectionBox.tsx / DevPanel.tsx  # 既有
-│   └── ViewerDock.tsx               # 新增：左栏上下分栏 + 拖拽分隔条
+│   ├── ViewerDock.tsx               # 新增：左栏上下分栏 + 拖拽分隔条
+│   └── inspector/                   # 新增
+│       ├── SceneOverview.tsx        # 未选中时的场景概览
+│       ├── SurfaceForm.tsx          # material/Surface
+│       ├── EnvironmentForm.tsx      # render/Environment
+│       ├── PostFXForm.tsx           # postfx/*
+│       └── CompileBanner.tsx        # 编译错误首行
 ├── graph/                           # 既有，扩展
 │   ├── workflow.ts                  # 修改：PORT_TYPES / SCHEMA_VERSION / migrateWorkflow
-│   ├── nodeRegistry.ts              # 修改：新增 19 个节点定义 + emit 字段
+│   ├── nodeDefinitions.ts           # 新增：纯数据定义（不 import LiteGraph）
+│   ├── nodeRegistry.ts              # 修改：只做 LiteGraph 注册与尺寸计算
 │   ├── portTypes.ts                 # 修改：PORT_COLORS + isValidTypePair 域隔离
 │   ├── typeSystem.ts                # 既有，通常无需改
 │   ├── EditorNode.ts                # 既有，环检测保持不变
@@ -442,31 +494,31 @@ src/
 │   └── glsl/chunks.ts               # 注入片段模板
 ├── viewer/                          # 新增
 │   ├── Viewport3D.tsx               # <Canvas frameloop={...}>
-│   ├── SceneRoot.tsx                # 读 activeRoot → Mesh + material
+│   ├── SceneRoot.tsx                # 读编译产物 → Mesh + material
 │   ├── Lights.tsx                   # Environment 节点驱动
-│   ├── ModelAsset.tsx               # GLTF 加载 + 失败兜底
+│   ├── ModelAsset.tsx               # 内置几何体 + GLTF 加载 + 失败兜底
+│   ├── material.ts                  # uniform 转换、PBR 注入、Unlit ShaderMaterial
 │   ├── assets.ts                    # assetId → THREE.Texture/Object3D 映射 + 释放
 │   ├── useViewerStore.ts
 │   ├── requestFrame.ts              # R3F 帧请求封装（避免与数据失效同名）
 │   └── contextLoss.ts               # WebGL context lost 处理
 ├── postfx/                          # 新增
 │   ├── chain.ts                     # 从 Output 逆序收集链
-│   ├── PostFXStack.tsx              # <EffectComposer key={chainHash}>
-│   └── effects/{Bloom,SSAO,Vignette,SMAA}.tsx
+│   └── PostFXStack.tsx              # <EffectComposer key={chainHash}>，效果组件内联
 ├── perf/                            # 新增
 │   ├── PerfProbe.tsx                # useFrame 采样，4Hz 写 store
 │   ├── usePerfStore.ts
 │   └── PerfHUD.tsx                  # DOM 浮层，非 canvas 内绘制
-└── tests/                           # 既有 2 文件 + 新增 3 文件
-    ├── history.test.ts / workflow.test.ts       # 既有
-    └── compiler.test.ts / chain.test.ts / validate.test.ts  # 新增
+└── tests/                           # 既有 2 文件 + 新增 4 文件
+    ├── history.test.ts / workflow.test.ts       # 既有（workflow 已扩到 13 项）
+    └── compiler.test.ts / chain.test.ts / validate.test.ts / signature.test.ts  # 新增
 ```
 
 ---
 
 ## 7. 实现步骤清单
 
-按顺序执行，每步完成后勾选并跑对应验证。
+> 阶段 0–F 已全部实现（见文首进度表）。以下保留原始步骤与验证项，供复查与回归时对照。
 
 ### 阶段 0：前置校正（约 1 天，不可跳过）
 
@@ -606,7 +658,8 @@ src/
 | `@react-three/drei` | `^9.114` | `OrbitControls` / `useGLTF` | **不要装 v10**（配 R3F v9）；按需引入避免打包膨胀 |
 | `@react-three/postprocessing` | `^2.16` | `EffectComposer` 与各效果 | **不要装 v3**（配 R3F v9） |
 | `postprocessing` | `^6.36` | 底层效果实现 | 上者的 peer dependency |
-| `object-hash`（可选） | 最新兼容版 | signature 计算 | 也可用自实现 djb2 |
+| `@types/three` | `^0.169` | three 类型 | **必需**：three 0.169 不自带类型，与 `three` 主版本保持一致 |
+| `object-hash`（可选） | 最新兼容版 | signature 计算 | 实际用自实现 djb2，未引入 |
 
 > 安装后执行 `npm ls three @react-three/fiber @react-three/drei @react-three/postprocessing` 核对 peer 解析结果。任何 `ERESOLVE` 都通过降小版本解决，不要 `--force` 或 `--legacy-peer-deps`。
 
@@ -619,4 +672,36 @@ src/
 | `Ref_React-LiteGraph节点面板项目规划.md` | 主文档。阶段 0–5 已完成（见 `README.md`）。本文件是**独立后续扩展**，不是插入主文档阶段 2 与 4 之间的步骤 |
 | `Ref_ComfyUI-Nodes2.0-架构研究报告.md` | 三项补强建议的取舍：`LayoutSource` 推迟（研究报告 7.1，当前拖拽由 LiteGraph 主导、React 只读镜像）；`invalidate` 通道保留，但落地形式为桥接层 `commit()` + 新增 `invalidateProgram()`；端口显示文本单一函数**已否决**（研究报告 5.3 的 v1.1 评估），继续读 `port.name`，不新增 `label` 与 `getPortDisplayText()` |
 
-> **实施建议**：主文档阶段 0–5 已完成，本扩展作为独立后续阶段实施。总增量约 **18–22 个工作日**（阶段 0 前置校正 1 天 + 阶段 A–F 约 15.5 天 + 联调与验收缓冲）。阶段 0 不可跳过：若不在 `coords.ts` 中先统一坐标换算，阶段 D 的双 Canvas 事件隔离会与现有 4 处散落公式叠加，调试成本显著上升。
+> **实施建议**：主文档阶段 0–5 已完成，本扩展作为独立后续阶段实施。阶段 0 不可跳过：若不在 `coords.ts` 中先统一坐标换算，阶段 D 的双 Canvas 事件隔离会与现有 4 处散落公式叠加，调试成本显著上升。
+
+---
+
+## 12. 实现偏差与后续
+
+以下是落地过程中相对设计稿的工程性调整，均已在代码中生效：
+
+| 项 | 设计稿 | 实际实现 | 原因 |
+|---|---|---|---|
+| 节点定义 | `NodeDefinition.emit` | `nodeDefinitions.ts` 纯数据 + `emitters/index.ts` 映射表 | 避免 `graph → shader` 循环依赖，并让编译层能在 Node 环境单测 |
+| 尺寸计算 | 定义文件内 | `nodeRegistry.ts` 内（读 `geometry.ts`） | `geometry.ts` 依赖 LiteGraph，不能进纯数据层 |
+| 编译产物 | 基础字段 | 增加 `uniformSources` / `mesh` / `meshFromNode` / `activeRootId` / `activeOutputId` / `uniformDeclarations` / `unlit` | 支撑 uniform-only 刷新、mesh 兜底与 Unlit 路径 |
+| UV varying | `vUv` | `vShaderUv` | 避免与 three 在 `USE_UV` 下的 `vUv` 重复声明 |
+| `Math.lerp` | 文档只给 a/b 两个输入 | 固定 `mix(a, b, 0.5)` 并产生 warning | 节点没有 t 输入，语义需明确 |
+| SSAO | 三个参数 | 额外补 `worldDistanceThreshold` 等四个必填参数 | `@react-three/postprocessing` 的类型要求 |
+| glTF 材质 | 直接替换 | 替换前记录原材质，清理时先恢复再 dispose | 防止误销毁 SceneRoot 的共享材质 |
+| 调试导出 | 直接 `graphToWorkflow` | 走 `useGraphActions.exportWorkflow()` | 保证导出包含 `shader_extension.viewer` |
+| postfx 效果文件 | `effects/{Bloom,...}.tsx` | 内联在 `PostFXStack.tsx` | 每个效果只有几行 JSX，拆文件收益低 |
+
+**实现后的验证基线（2026-11-18）**
+
+- `npm test`：6 个文件 / **53 项**通过（compiler 10、chain 6、validate 9、signature 9、workflow 13、history 6）
+- `npm run verify:canvas`：**63/63** 通过
+- `npm run build`：通过；产物约 1.5 MB（gzip 417 KB）
+- E2E 已验证：PBR 注入、Unlit、Bloom、颜色/灯光实时刷新且 `hash` 不变、编译错误节点标红且视口保留上一帧、schema v2 导出导入、相机持久化、`WEBGL_lose_context` 恢复
+
+**后续可做**
+
+- `shader/Texture` 目前没有纹理上传 UI，`assetId` 需手填；`assets.ts` 已预留 `registerTexture` 与 1×1 白色兜底
+- Firefox 的 SSAO 兼容性降级（当前未做能力检测）
+- three 分包（`manualChunks`）以降低首屏体积
+- glTF 动画 / 骨骼、多材质槽仍属于 Out of Scope

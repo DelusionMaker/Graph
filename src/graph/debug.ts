@@ -68,7 +68,8 @@ export function attachDebugApi(graph: LGraph, canvas: LGraphCanvas): () => void 
     measurePorts: () => measurePorts(graph, canvas),
     measureNodeBoxes: () => measureNodeBoxes(graph, canvas),
     measureNativeDrawing: () => measureNativeDrawing(graph, canvas),
-    exportWorkflow: () => graphToWorkflow(graph),
+    // 走 actions 的导出，确保带上 shader_extension.viewer 等扩展配置
+    exportWorkflow: () => useGraphActions.getState().exportWorkflow() ?? graphToWorkflow(graph),
     exportPrompt: () => toPromptAPI(graphToWorkflow(graph)),
     importWorkflow: (raw) => useGraphActions.getState().importWorkflow(raw),
     undo: () => useGraphActions.getState().undo(),

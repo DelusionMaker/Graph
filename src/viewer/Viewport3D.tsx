@@ -1,12 +1,15 @@
 import { OrbitControls } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useUiStore } from '../graph/uiStore'
 import { PerfHUD } from '../perf/PerfHUD'
 import { PerfProbe } from '../perf/PerfProbe'
 import { PostFXStack } from '../postfx/PostFXStack'
+import { invalidateProgram } from '../shader/invalidateProgram'
 import { useProgramStore } from '../shader/useProgramStore'
+import { installContextLossHandling } from './contextLoss'
 import { Lights } from './Lights'
+import { useRequestFrame } from './requestFrame'
 import { SceneRoot } from './SceneRoot'
 import { useViewerStore } from './useViewerStore'
 
@@ -54,10 +57,28 @@ export function Viewport3D() {
 
         <OrbitControls makeDefault target={initialCamera.target} enableDamping={false} />
         <CameraSync />
+        <ContextLossHandler />
       </Canvas>
       <PerfHUD />
     </div>
   )
+}
+
+/** 上下文恢复后强制重编译一次并请求重绘 */
+function ContextLossHandler() {
+  const gl = useThree((state) => state.gl)
+  const requestFrame = useRequestFrame()
+
+  useEffect(
+    () =>
+      installContextLossHandling(gl, () => {
+        invalidateProgram({ immediate: true })
+        requestFrame()
+      }),
+    [gl, requestFrame],
+  )
+
+  return null
 }
 
 const round = (value: number) => Math.round(value * 1000) / 1000

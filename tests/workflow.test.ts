@@ -191,6 +191,27 @@ describe('parseWorkflow 三级校验', () => {
     expect(workflow?.nodes[1].inputs[0].link).toBe(1)
   })
 
+  it('v1 文档迁移到 v2 并补默认视口相机', () => {
+    const { workflow } = parseWorkflow({
+      nodes: [],
+      links: [],
+      config: { schema_version: 1 },
+    })
+    expect(workflow?.config.schema_version).toBe(SCHEMA_VERSION)
+    expect(workflow?.config.shader_extension?.viewer?.camera?.position).toEqual([3, 2.4, 4.2])
+  })
+
+  it('v2 文档保留原有 shader_extension', () => {
+    const camera = { position: [1, 2, 3], target: [0, 1, 0] }
+    const { workflow } = parseWorkflow({
+      nodes: [],
+      links: [],
+      config: { schema_version: 2, shader_extension: { viewer: { camera } } },
+    })
+    expect(workflow?.config.schema_version).toBe(2)
+    expect(workflow?.config.shader_extension?.viewer?.camera).toEqual(camera)
+  })
+
   it('缺失的坐标 / 尺寸回落默认值，并写回 schema_version', () => {
     const { workflow } = parseWorkflow({ nodes: [{ id: 5, type: 'a' }], links: [] })
     expect(workflow?.nodes[0].pos).toEqual([0, 0])

@@ -8,8 +8,14 @@ import {
   type WorkflowUI,
 } from './workflow'
 
-/** LGraph → UI 格式（带布局，可直接 JSON 化） */
-export function graphToWorkflow(graph: LGraph): WorkflowUI {
+/**
+ * LGraph → UI 格式（带布局，可直接 JSON 化）。
+ * extraConfig 用于写入 config 下的扩展状态（如 shader_extension.viewer）。
+ */
+export function graphToWorkflow(
+  graph: LGraph,
+  extraConfig?: Record<string, unknown>,
+): WorkflowUI {
   const nodes: UINode[] = graph.nodes.map((node) => ({
     id: Number(node.id),
     type: node.type,
@@ -46,7 +52,7 @@ export function graphToWorkflow(graph: LGraph): WorkflowUI {
     nodes,
     links,
     groups: [],
-    config: { schema_version: SCHEMA_VERSION },
+    config: { schema_version: SCHEMA_VERSION, ...extraConfig },
   }
 }
 

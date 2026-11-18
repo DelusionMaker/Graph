@@ -5,7 +5,7 @@
  * - 执行格式：纯拓扑，用于提交后端
  */
 
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 export const PORT_TYPES = [
   // 既有 ComfyUI 类型，全部保留
@@ -71,8 +71,19 @@ export interface UIGroup {
 /** [link_id, 源节点, 源槽位, 目标节点, 目标槽位, 类型] */
 export type UILink = [number, number, number, number, number, string]
 
+/** v2 新增：3D 视口等扩展状态，放在 config 下避免污染节点数组 */
+export interface ShaderExtension {
+  viewer?: {
+    camera?: {
+      position: [number, number, number]
+      target: [number, number, number]
+    }
+  }
+}
+
 export interface WorkflowConfig {
   schema_version: number
+  shader_extension?: ShaderExtension
   [key: string]: unknown
 }
 
@@ -335,13 +346,29 @@ export function parseWorkflow(raw: unknown): ParseResult {
     nodes,
     links,
     groups,
-    config: { ...rawConfig, schema_version: SCHEMA_VERSION },
+    // 保留原始版本，交给 migrateWorkflow 判断升级路径
+    config: { ...rawConfig, schema_version: rawVersion },
   }
 
   return { workflow: migrateWorkflow(workflow), issues }
 }
 
-/** 版本迁移入口：后续 schema 升级时在这里按版本分派 */
+const DEFAULT_VIEWER_CAMERA = {
+  position: [3, 2.4, 4.2] as [number, number, number],
+  target: [0, 0, 0] as [number, number, number],
+}
+
+/**
+ * 版本迁移入口：按版本分派。
+ * v1 → v2：补 shader_extension 默认视口相机，其余保持不变。
+ */
 export function migrateWorkflow(workflow: WorkflowUI): WorkflowUI {
-  return workflow
+  const version = Number(workflow.config.schema_version ?? 1)
+  if (version >= SCHEMA_VERSION) return workflow
+
+  const config: WorkflowConfig = { ...workflow.config }
+  if (!config.shader_extension) {
+    config.shader_extension = { viewer: { camera: { ...DEFAULT_VIEWER_CAMERA } } }
+  }
+  return { ...workflow, config: { ...config, schema_version: SCHEMA_VERSION } }
 }

@@ -15,6 +15,7 @@ import { useToastStore } from './toastStore'
 import { installTypeSystem } from './typeSystem'
 import { useUiStore } from './uiStore'
 import { parseWorkflow, toPromptAPI, type ImportIssue, type WorkflowUI } from './workflow'
+import { useViewerStore } from '../viewer/useViewerStore'
 import type {
   LinkSnapshot,
   NodeGeometryUpdate,
@@ -210,12 +211,20 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
     const history = new SnapshotHistory({ limit: 50, coalesceWindowMs: 600 })
     let autosaveTimer = 0
 
-    const snapshotGraph = () => JSON.stringify(graphToWorkflow(graph))
-    const persistNow = () => writePersistedWorkflow(graphToWorkflow(graph))
+    // schema v2：3D 视口相机随工作流一起保存
+    const viewerConfig = () => ({
+      shader_extension: { viewer: { camera: useViewerStore.getState().camera } },
+    })
+    const snapshotGraph = () => JSON.stringify(graphToWorkflow(graph, viewerConfig()))
+    const persistNow = () => writePersistedWorkflow(graphToWorkflow(graph, viewerConfig()))
     const queueAutosave = () => {
       window.clearTimeout(autosaveTimer)
       autosaveTimer = window.setTimeout(persistNow, AUTOSAVE_DELAY)
     }
+    // 相机变化不经过 commit，单独防抖保存
+    const unsubscribeViewer = useViewerStore.subscribe((state, previous) => {
+      if (state.camera !== previous.camera) queueAutosave()
+    })
     const syncHistoryFlags = () => {
       useGraphActions.setState({ canUndo: history.canUndo, canRedo: history.canRedo })
     }
@@ -235,6 +244,9 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
       try {
         clearLinkSelection()
         const issues = applyWorkflow(graph, canvas, workflow)
+        // schema v2：恢复或导入时还原 3D 相机
+        const camera = workflow.config.shader_extension?.viewer?.camera
+        if (camera) useViewerStore.getState().setCamera(camera)
         syncSnapshot()
         syncViewport()
         return issues
@@ -262,7 +274,7 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
       syncHistoryFlags()
     }
 
-    const exportWorkflow = () => graphToWorkflow(graph)
+    const exportWorkflow = () => graphToWorkflow(graph, viewerConfig())
     const exportPrompt = () => toPromptAPI(graphToWorkflow(graph))
     const importWorkflow = (raw: unknown): { ok: boolean; issues: ImportIssue[] } => {
       const { workflow, issues } = parseWorkflow(raw)
@@ -607,6 +619,7 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
     return () => {
       observer.disconnect()
       unsubscribeTheme()
+      unsubscribeViewer()
       window.removeEventListener('pointerdown', onPointerDown, true)
       element.removeEventListener('pointerup', onPointerUp, true)
       element.removeEventListener('pointermove', onPointerMove, true)
