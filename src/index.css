@@ -414,6 +414,14 @@ body.is-resizing-dock {
     0 0 0 4px rgba(74, 158, 255, 0.18);
 }
 
+/* 编译错误节点：覆盖选中态，保证错误一眼可见 */
+.graph-node.is-error {
+  outline: 2px solid var(--error);
+  box-shadow:
+    0 2px 8px var(--shadow),
+    0 0 0 4px color-mix(in srgb, var(--error) 18%, transparent);
+}
+
 .graph-node-title {
   display: flex;
   align-items: center;
@@ -686,6 +694,80 @@ body.is-resizing-dock {
 .inspector-port-type {
   color: var(--text-dim);
   font-size: 11px;
+}
+
+.inspector-error-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--error);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--error) 12%, transparent);
+  color: var(--error);
+  font-size: 12px;
+}
+
+.inspector-error-banner strong {
+  font-size: 12px;
+}
+
+.inspector-error-hint {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.inspector .inspector-error {
+  color: var(--error);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.inspector-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.inspector-input-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.inspector-input-name {
+  color: var(--text-dim);
+}
+
+.inspector-input-state {
+  color: var(--text-dim);
+  font-size: 11px;
+  text-align: right;
+}
+
+.inspector-input-state.is-linked {
+  color: var(--accent-strong);
+}
+
+.inspector-note {
+  margin-top: 8px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.scene-chain {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.scene-chain li {
+  margin: 2px 0;
 }
 
 .dev-panel button {

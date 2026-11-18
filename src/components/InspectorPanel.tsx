@@ -1,25 +1,38 @@
 import { portColor } from '../graph/portTypes'
 import { useGraphStore } from '../graph/store'
+import { useProgramStore } from '../shader/useProgramStore'
 import { Widget } from './Widget'
+import { CompileBanner } from './inspector/CompileBanner'
+import { EnvironmentForm } from './inspector/EnvironmentForm'
+import { PostFXForm } from './inspector/PostFXForm'
+import { SceneOverview } from './inspector/SceneOverview'
+import { SurfaceForm } from './inspector/SurfaceForm'
+
+/** 这些类型有专门的表单，通用"参数"区块不再重复渲染 */
+function hasCustomForm(type: string): boolean {
+  return type === 'material/Surface' || type === 'render/Environment' || type.startsWith('postfx/')
+}
 
 export function InspectorPanel() {
   const nodes = useGraphStore((state) => state.nodes)
   const selectedIds = useGraphStore((state) => state.selectedIds)
+  const errors = useProgramStore((state) => state.errors)
   const node = selectedIds.length === 1 ? nodes.find((item) => item.id === selectedIds[0]) : undefined
 
-  if (!node) {
-    return (
-      <div className="inspector-empty" role="status">
-        <p>未选中节点</p>
-        <span>在画布中点击一个节点查看详情</span>
-      </div>
-    )
-  }
+  if (!node) return <SceneOverview />
+
+  const nodeErrors = errors.filter((error) => error.nodeId === node.id)
 
   return (
     <div className="inspector">
+      <CompileBanner errors={nodeErrors} />
+
       <h2>{node.title}</h2>
       <p className="hint">{node.type}</p>
+
+      {node.type === 'material/Surface' && <SurfaceForm node={node} />}
+      {node.type === 'render/Environment' && <EnvironmentForm node={node} />}
+      {node.type.startsWith('postfx/') && <PostFXForm node={node} />}
 
       <section>
         <h3>布局</h3>
@@ -59,7 +72,7 @@ export function InspectorPanel() {
         )}
       </section>
 
-      {node.widgets.length > 0 && (
+      {!hasCustomForm(node.type) && node.widgets.length > 0 && (
         <section>
           <h3>参数</h3>
           {node.widgets.map((widget) => (

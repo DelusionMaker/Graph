@@ -737,8 +737,12 @@ try {
   const canvasTopLeft = await page.locator('.graph-canvas').boundingBox()
   await page.mouse.click(canvasTopLeft.x + 30, canvasTopLeft.y + 30)
   await page.waitForTimeout(200)
-  const inspectorEmpty = await page.evaluate(() => Boolean(document.querySelector('.inspector-empty')))
-  check('检查器空态', inspectorEmpty, inspectorEmpty ? '未选中提示' : '仍显示节点')
+  const inspectorEmpty = await page.evaluate(() => {
+    const panel = document.querySelector('.inspector')
+    const text = panel?.textContent ?? ''
+    return Boolean(panel && text.includes('场景概览') && text.includes('未选中'))
+  })
+  check('检查器空态', inspectorEmpty, inspectorEmpty ? '场景概览' : '仍显示节点')
 
   // ㉓ 迷你地图：节点数量、投影稳定、点击目标点居中、重复点击不漂移
   const miniBefore = await page.evaluate(() => {

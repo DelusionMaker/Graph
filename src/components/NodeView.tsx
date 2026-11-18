@@ -7,15 +7,16 @@ import { Widget } from './Widget'
 interface Props {
   node: NodeSnapshot
   selected: boolean
+  hasError?: boolean
 }
 
-export const NodeView = memo(function NodeView({ node, selected }: Props) {
+export const NodeView = memo(function NodeView({ node, selected, hasError = false }: Props) {
   const slotRows = Math.max(node.inputs.length, node.outputs.length, 1)
   const widgetsTop = GEOMETRY.titleHeight + slotRows * GEOMETRY.slotHeight + 6
 
   return (
     <div
-      className={`graph-node${selected ? ' is-selected' : ''}`}
+      className={`graph-node${selected ? ' is-selected' : ''}${hasError ? ' is-error' : ''}`}
       data-node-id={node.id}
       style={{
         left: node.pos[0],
