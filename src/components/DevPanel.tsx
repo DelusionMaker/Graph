@@ -32,9 +32,8 @@ export function DevPanel({ context }: Props) {
   }
 
   return (
-    <aside className="dev-panel">
-      <h2>开发验证</h2>
-      <p className="hint">阶段 3 · 数据与状态</p>
+    <div className="dev-panel">
+      <p className="hint">阶段 4 · 视觉与完善</p>
 
       <section>
         <h3>几何对齐</h3>
@@ -76,6 +75,6 @@ export function DevPanel({ context }: Props) {
           <li>偏移：{viewport.x.toFixed(0)}, {viewport.y.toFixed(0)}</li>
         </ul>
       </section>
-    </aside>
+    </div>
   )
 }

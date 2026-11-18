@@ -13,6 +13,8 @@ export interface ImportResult {
 export interface GraphActions {
   addNode: (type: string, pos?: [number, number]) => void
   setWidgetValue: (nodeId: number, index: number, value: unknown) => void
+  /** 把视口中心移到指定图坐标（迷你地图导航用） */
+  centerOn: (graphX: number, graphY: number) => void
   undo: () => void
   redo: () => void
   canUndo: boolean
@@ -28,6 +30,7 @@ const failedImport = (): ImportResult => ({ ok: false, issues: [{ level: 1, mess
 export const defaultGraphActions: GraphActions = {
   addNode: noop,
   setWidgetValue: noop,
+  centerOn: noop,
   undo: noop,
   redo: noop,
   canUndo: false,

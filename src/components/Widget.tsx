@@ -26,6 +26,7 @@ function WidgetControl({ widget, onChange }: { widget: WidgetSnapshot; onChange:
       return (
         <select
           className="graph-widget-select"
+          aria-label={widget.name}
           value={String(widget.value)}
           onChange={(event) => onChange(event.target.value)}
         >
@@ -41,6 +42,7 @@ function WidgetControl({ widget, onChange }: { widget: WidgetSnapshot; onChange:
         <input
           className="graph-widget-number"
           type="number"
+          aria-label={widget.name}
           value={Number(widget.value)}
           min={widget.min}
           max={widget.max}
@@ -53,6 +55,7 @@ function WidgetControl({ widget, onChange }: { widget: WidgetSnapshot; onChange:
         <span className="graph-widget-slider">
           <input
             type="range"
+            aria-label={widget.name}
             value={Number(widget.value)}
             min={widget.min ?? 0}
             max={widget.max ?? 1}
@@ -67,6 +70,7 @@ function WidgetControl({ widget, onChange }: { widget: WidgetSnapshot; onChange:
         <input
           className="graph-widget-toggle"
           type="checkbox"
+          aria-label={widget.name}
           checked={Boolean(widget.value)}
           onChange={(event) => onChange(event.target.checked)}
         />
@@ -76,6 +80,7 @@ function WidgetControl({ widget, onChange }: { widget: WidgetSnapshot; onChange:
         <input
           className="graph-widget-text"
           type="text"
+          aria-label={widget.name}
           value={String(widget.value)}
           onChange={(event) => onChange(event.target.value)}
         />

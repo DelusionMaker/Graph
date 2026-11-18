@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { useGraphActions } from '../graph/actions'
+import { useUiStore } from '../graph/uiStore'
 
 function downloadJson(filename: string, data: unknown): void {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -20,6 +21,8 @@ export function HeaderActions() {
   const exportWorkflow = useGraphActions((state) => state.exportWorkflow)
   const exportPrompt = useGraphActions((state) => state.exportPrompt)
   const importWorkflow = useGraphActions((state) => state.importWorkflow)
+  const theme = useUiStore((state) => state.theme)
+  const toggleTheme = useUiStore((state) => state.toggleTheme)
 
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -67,6 +70,13 @@ export function HeaderActions() {
       </button>
       <button type="button" onClick={() => fileRef.current?.click()}>
         导入
+      </button>
+      <button
+        type="button"
+        onClick={toggleTheme}
+        aria-label={`切换到${theme === 'dark' ? '浅色' : '深色'}主题`}
+      >
+        {theme === 'dark' ? '浅色' : '深色'}
       </button>
       <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={handleImport} />
     </div>

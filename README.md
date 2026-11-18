@@ -1,6 +1,6 @@
 # React + LiteGraph 节点编辑器
 
-按《React-LiteGraph节点面板项目规划》实现的 Web 节点编辑器。当前处于 **阶段 3：数据与状态**——LiteGraph 负责图模型与画布交互，React 渲染节点 DOM、Widget、节点库与外围 UI；数据层支持双格式导入导出、本地持久化与撤销/重做。
+按《React-LiteGraph节点面板项目规划》实现的 Web 节点编辑器。当前处于 **阶段 4：视觉与完善**——LiteGraph 负责图模型与画布交互，React 渲染节点 DOM、Widget、节点库与外围 UI；数据层支持双格式导入导出与撤销/重做，视觉层提供双主题、LOD、迷你地图、检查器与响应式布局。
 
 ## 环境
 
@@ -43,7 +43,7 @@ npm run verify:canvas
 | 节点缩放 | 拖动节点右下角实时改变尺寸，DOM、端口、连线在拖动过程中同步跟随 |
 | 连线 | 从输出端口拖到输入端口；端口热区 `pointer-events: none`，事件穿透到 canvas |
 | 删除连线 | 点击连线使其高亮（蓝色），按 Delete/Backspace |
-| 节点库 | 左侧分类列表 + 关键字搜索，点击或拖拽到画布添加 |
+| 节点库 | 左侧分类列表 + 关键字搜索；点击 = 在视口中心添加，拖拽 = 在落点添加（拖动中不建节点，画布显示虚线落点高亮） |
 | Widget | React 渲染 number / slider / combo / text / toggle，修改写回 LiteGraph widget |
 | 类型系统 | 端口与连线按类型着色；`INT↔FLOAT` 互连放行，其余非法连接由 LiteGraph 原生拦截 |
 | 节点注册 | `NodeDefinition` 声明输入/输出/Widget，运行时注册为 LiteGraph 节点类型 |
@@ -52,6 +52,12 @@ npm run verify:canvas
 | 持久化 | 图变更后 1s 防抖写入 `localStorage`（键 `node-editor:workflow:v1`），刷新自动恢复 |
 | 撤销/重做 | 快照式历史栈（上限 50），连续调参合并为一条；`Ctrl/⌘+Z`、`Ctrl/⌘+Shift+Z` |
 | 导入校验 | ① 结构错误拒绝导入；② 悬空连线/重复 id 丢弃并提示；③ 未知端口类型降级为 `*` |
+| 主题 | 亮/暗双主题，CSS 变量 + LiteGraph 画布底色/网格联动，切换不丢图数据与视口 |
+| LOD | 缩放 < 0.5x 隐藏节点文字、Widget 与端口标签，只保留色块和端口 |
+| 迷你地图 | 右下角展示节点分布与当前视口，点击可导航 |
+| 检查器 | 右侧面板显示选中节点的类型、布局、端口与参数（可直接编辑） |
+| 响应式 | 1280px / 1920px 无溢出，窄屏逐级收起检查器与节点库 |
+| 无障碍 | 画布/按钮/Widget 均有可访问名称，键盘焦点可见，尊重 `prefers-reduced-motion` |
 
 内置 5 种示例节点：Checkpoint 加载器、CLIP 文本编码、KSampler、空潜空间图像、VAE 解码。
 
@@ -59,15 +65,18 @@ npm run verify:canvas
 
 ## 验证口径
 
-`npm run verify:canvas` 共 49 项检查：
+`npm run verify:canvas` 共 63 项检查：
 
 - **几何**：0.2x / 1x / 3x 三档缩放且各带不同平移量，端口圆心与节点框偏差均 < 2px；节点包围盒与 DOM 对齐 < 1px；
 - **原生绘制**：对比"节点在画布内 / 临时移出画布"两帧的 canvas 像素差异（0%），并用反证用例确认恢复 `drawNode` 后差异为 100%；
 - **交互**：端口拖拽连线、状态栏同步、端口连接态、中键平移、滚轮缩放后连线端点贴合端口（读 canvas 像素，实测 < 2px）、点击选中连线、Delete 删除、点击选中节点、框选提示框跟随指针（< 2px）、框选同步、多选拖拽、拖动实时跟随、缩放节点时 DOM/端口实时跟随、Widget 上滚轮以光标为锚点缩放（锚点漂移 < 2px）；
 - **回归**：节点上方空白处框选不误选；
 - **类型系统**：VAE→MODEL 非法连接被拦截、端口按类型着色；
-- **节点系统**：Widget 修改写回图数据、节点库搜索过滤、从节点库添加节点、新增节点可正常连线；
+- **节点系统**：Widget 修改写回图数据、节点库搜索过滤、从节点库添加节点、拖拽只在画布落点创建一个节点、新增节点可正常连线；
 - **数据层**：撤销/重做（连线、节点增删、Widget 变更、Ctrl+Z 快捷键）、导出再导入结构一致、执行格式的连线与 Widget 映射、非法导入被拒绝、刷新后从 localStorage 恢复；
+- **视觉与布局**：主题切换保持图状态并持久化、低缩放 LOD、检查器显示/空态、迷你地图节点数与点击导航（目标点居中、投影不随视口漂移、重复点击不位移）、1280/1920px 无溢出；
+- **性能**：100 节点在 0.3x 下 `canvas.draw` < 20ms/帧（实测约 0.3ms）；
+- **无障碍**：画布、工具按钮、Widget 控件均有可访问名称；
 - **稳定性**：无页面异常。
 
 单元测试 `npm test`（Vitest）覆盖纯数据层 17 项：`toPromptAPI` 的连线/静音/Widget 覆盖规则、`parseWorkflow` 的三级校验与索引重建、`SnapshotHistory` 的去重/上限/分支截断/合并窗口。
@@ -115,6 +124,9 @@ npm run verify:canvas
 13. **撤销/重做用快照而不是逆操作**：操作点分散在 LiteGraph 内部（拖拽、连线、删除），逐操作实现逆变换易漏。每条历史记录是一份 UI 工作流 JSON，恢复时重建整图；重建期间用 `suspendHistory` 屏蔽 `graph.clear()` / 逐节点 `add` 产生的中间态。高频调参用"仅合并连续同类操作"的窗口策略，避免历史被拖动冲掉。
 14. **持久化与历史解耦**：`commit()` 同时负责历史与 1s 防抖自动保存；启动时先尝试 localStorage 恢复，失败或为空再写入示例图，避免"刷新后画布空一片"。
 15. **导入三级校验**：结构错误直接拒绝；悬空连线、重复 id、越界槽位按引用问题丢弃；未知端口类型降级为 `*`。为避免 UI 格式与节点定义耦合，序列化时额外写入 `widget_names`，`toPromptAPI` 不再依赖节点定义即可正确映射输入名。
+16. **主题是"一份状态、两处消费"**：`useUiStore` 保存主题并持久化，App 负责写 `data-theme` 驱动 CSS 变量，桥接层订阅同一状态更新 LiteGraph 的底色与网格图。切换只重绘，不重建图，因此不会丢数据或重置视口。浅色主题需要单独生成浅色网格图，并清掉 LiteGraph 内部的 pattern 缓存（它不会随 `background_image` 自动重建）。
+17. **LOD 与迷你地图都只读镜像状态**：LOD 由 `viewport.zoom < 0.5` 派生 CSS 类；迷你地图根据 `nodes` / `viewport` / `canvasSize` 纯计算投影，不直接读 canvas 实例，点击导航走 `centerOn` 动作。
+18. **迷你地图边界只由节点决定**：若边界取"节点 ∪ 视口"，每次导航都会改变缩放比例，地图内容整体跳动、同一像素点两次落点不同。改为节点包围盒 + 最小跨度（1200×800）+ padding 后投影稳定；`centerOn` 的偏移必须写成 `画布尺寸 / (2 × zoom) - 图坐标`（屏幕坐标 = `(图坐标 + offset) × zoom`），符号写反会把点击位置镜像到画布另一侧。
 
 ## 项目结构
 
@@ -137,18 +149,22 @@ src/
 │   ├── serialize.ts            # LGraph ↔ UI 工作流往返
 │   ├── history.ts              # 快照历史栈（上限/合并窗口）
 │   ├── persistence.ts          # localStorage 读写
+│   ├── uiStore.ts              # 主题状态与持久化
 │   ├── seed.ts                 # 示例工作流
 │   ├── useLiteGraphBridge.ts   # 核心桥接：生命周期 + 同步 + 历史/持久化
 │   ├── measure.ts              # 几何对齐与原生绘制测量
 │   └── debug.ts                # 开发期 window.__graphDebug
 ├── components/
-│   ├── HeaderActions.tsx       # 撤销/重做、导入导出
+│   ├── HeaderActions.tsx       # 撤销/重做、导入导出、主题切换
 │   ├── GraphCanvas.tsx         # 画布容器（挂载桥接层、处理拖拽添加）
 │   ├── NodeLibrary.tsx         # 节点库侧栏（分类 + 搜索 + 点击/拖拽）
-│   ├── NodeOverlay.tsx         # React 节点覆盖层
+│   ├── NodeOverlay.tsx         # React 节点覆盖层（含 LOD）
 │   ├── NodeView.tsx            # 单节点 DOM（标题 / 端口 / Widget）
 │   ├── Widget.tsx              # Widget 控件与回写
 │   ├── SelectionBox.tsx        # 框选提示框（React 绘制，位于节点之上）
+│   ├── MiniMap.tsx             # 迷你地图（点击导航）
+│   ├── SidePanel.tsx           # 右侧面板（检查器 / 开发验证页签）
+│   ├── InspectorPanel.tsx      # 选中节点详情与参数
 │   ├── StatusBar.tsx           # 节点/连线/选中/缩放
 │   └── DevPanel.tsx            # 开发验证面板（仅 DEV）
 scripts/
@@ -157,4 +173,4 @@ scripts/
 
 ## 后续阶段
 
-阶段 4：视觉与完善（主题系统、LOD、迷你地图、检查器面板、响应式、无障碍）。遗留：节点折叠、静音/旁路 UI、非法连接提示 Toast、组（Group）序列化。
+阶段 5：验收与文档（全流程测试、性能 Profile、示例工作流）。遗留：节点折叠、静音/旁路 UI、非法连接提示 Toast、组（Group）序列化。

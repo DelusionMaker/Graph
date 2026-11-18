@@ -25,7 +25,7 @@ export const NodeView = memo(function NodeView({ node, selected }: Props) {
       }}
     >
       <div className="graph-node-title" style={{ height: GEOMETRY.titleHeight }}>
-        {node.title}
+        <span className="graph-node-title-text">{node.title}</span>
         <span className="graph-node-id">#{node.id}</span>
       </div>
 

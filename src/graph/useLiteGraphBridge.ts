@@ -9,6 +9,7 @@ import { seedDemoGraph } from './seed'
 import { applyWorkflow, graphToWorkflow } from './serialize'
 import { useGraphStore } from './store'
 import { installTypeSystem } from './typeSystem'
+import { useUiStore } from './uiStore'
 import { parseWorkflow, toPromptAPI, type ImportIssue, type WorkflowUI } from './workflow'
 import type {
   LinkSnapshot,
@@ -48,6 +49,41 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
     canvas.render_shadows = false
     // 关闭 FPS/节点计数调试信息（默认会画在画布左下角）
     canvas.show_info = false
+
+    // 浅色主题需要一张浅色网格图（默认的深色网格图叠加在浅底上会发灰）
+    const createGridImage = (stroke: string, step = 20): string | null => {
+      const grid = document.createElement('canvas')
+      grid.width = step
+      grid.height = step
+      const ctx = grid.getContext('2d')
+      if (!ctx) return null
+      ctx.strokeStyle = stroke
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(0, 0.5)
+      ctx.lineTo(step, 0.5)
+      ctx.moveTo(0.5, 0)
+      ctx.lineTo(0.5, step)
+      ctx.stroke()
+      return grid.toDataURL()
+    }
+    const lightGrid = createGridImage('rgba(15, 23, 42, 0.10)')
+
+    // 主题切换只重绘画布底色，不触碰图数据与视口
+    const applyCanvasTheme = (theme: string) => {
+      canvas.clear_background_color = theme === 'light' ? '#f6f7fa' : '#222'
+      if (lightGrid) {
+        canvas.background_image =
+          theme === 'light' ? lightGrid : LGraphCanvas.DEFAULT_BACKGROUND_IMAGE
+        // LiteGraph 会缓存 pattern，换图后必须清掉缓存才会重建
+        const internal = canvas as unknown as { _pattern?: unknown; _bg_img?: unknown }
+        internal._pattern = null
+        internal._bg_img = null
+      }
+      canvas.setDirty(true, true)
+    }
+    applyCanvasTheme(useUiStore.getState().theme)
+    const unsubscribeTheme = useUiStore.subscribe((state) => applyCanvasTheme(state.theme))
 
     // 关闭原生节点绘制：只 arrange() 维持槽位坐标，不画节点本体
     canvas.drawNode = (node) => {
@@ -431,8 +467,12 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
     element.addEventListener('keydown', onKeyDown)
     wheelTarget.addEventListener('wheel', onWheel, { passive: false })
 
-    const observer = new ResizeObserver(() => canvas.resize())
+    const observer = new ResizeObserver(() => {
+      canvas.resize()
+      useGraphStore.getState().setCanvasSize({ w: element.clientWidth, h: element.clientHeight })
+    })
     observer.observe(element)
+    useGraphStore.getState().setCanvasSize({ w: element.clientWidth, h: element.clientHeight })
 
     const addNode = (type: string, pos?: [number, number]) => {
       const node = LiteGraph.createNode(type)
@@ -450,6 +490,16 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
       scheduleSync()
     }
 
+    const centerOn = (graphX: number, graphY: number) => {
+      const rect = element.getBoundingClientRect()
+      const scale = canvas.ds.scale
+      // 屏幕坐标 = (图坐标 + offset) * scale；要让该图坐标落在画布中心：
+      // offset = 画布尺寸 / (2 * scale) - 图坐标（注意是"尺寸减坐标"，写反会把点击位置镜像到另一侧）
+      canvas.ds.offset = [rect.width / (2 * scale) - graphX, rect.height / (2 * scale) - graphY]
+      canvas.setDirty(true, true)
+      syncViewport()
+    }
+
     const setWidgetValue = (nodeId: number, index: number, value: unknown) => {
       const widget = graph.getNodeById(nodeId)?.widgets?.[index]
       if (!widget) return
@@ -464,6 +514,7 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
     useGraphActions.setState({
       addNode,
       setWidgetValue,
+      centerOn,
       undo,
       redo,
       exportWorkflow,
@@ -500,6 +551,7 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
 
     return () => {
       observer.disconnect()
+      unsubscribeTheme()
       window.removeEventListener('pointerdown', onPointerDown, true)
       element.removeEventListener('pointerup', onPointerUp, true)
       element.removeEventListener('pointermove', onPointerMove, true)

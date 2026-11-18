@@ -7,11 +7,14 @@ interface GraphState {
   links: LinkSnapshot[]
   selectedIds: number[]
   viewport: Viewport
+  /** 画布 DOM 尺寸（CSS 像素），供迷你地图等组件换算视口 */
+  canvasSize: { w: number; h: number }
   selectionRect: SelectionRect | null
   setNodes: (nodes: NodeSnapshot[]) => void
   setLinks: (links: LinkSnapshot[]) => void
   setSelection: (ids: number[]) => void
   setSelectionRect: (rect: SelectionRect | null) => void
+  setCanvasSize: (size: { w: number; h: number }) => void
   updateNodeGeometry: (updates: NodeGeometryUpdate[]) => void
   setViewport: (viewport: Viewport) => void
 }
@@ -24,11 +27,13 @@ export const useGraphStore = create<GraphState>((set) => ({
   links: [],
   selectedIds: [],
   viewport: { x: 0, y: 0, zoom: 1 },
+  canvasSize: { w: 0, h: 0 },
   selectionRect: null,
   setNodes: (nodes) => set({ nodes }),
   setLinks: (links) => set({ links }),
   setSelection: (selectedIds) => set({ selectedIds }),
   setSelectionRect: (selectionRect) => set({ selectionRect }),
+  setCanvasSize: (canvasSize) => set({ canvasSize }),
   // 拖动/缩放时只更新变化的节点，未变节点保持同一引用，配合 React.memo 避免全量重渲染
   updateNodeGeometry: (updates) =>
     set((state) => {

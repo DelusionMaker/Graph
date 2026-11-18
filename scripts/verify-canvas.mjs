@@ -459,6 +459,34 @@ try {
   const nodesAfter = await page.evaluate(() => window.__graphDebug.graph.nodes.length)
   check('从节点库添加节点', nodesAfter === nodesBefore + 1, `${nodesBefore} → ${nodesAfter}`)
 
+  // 拖拽添加：拖动过程中不建节点，只有落在画布才建一个，且落点跟随鼠标
+  const dragBefore = await page.evaluate(() => window.__graphDebug.graph.nodes.length)
+  const libItemBox = await page.locator('.node-library-item').first().boundingBox()
+  const dragCanvasBox = await page.locator('.graph-canvas').boundingBox()
+  await page.mouse.move(libItemBox.x + 30, libItemBox.y + 12)
+  await page.mouse.down()
+  await page.mouse.move(dragCanvasBox.x + 420, dragCanvasBox.y + 300, { steps: 10 })
+  await page.waitForTimeout(200)
+  const dragDuring = await page.evaluate(() => ({
+    count: window.__graphDebug.graph.nodes.length,
+    highlight: document.querySelector('.graph-canvas')?.classList.contains('is-drop-target') ?? false,
+  }))
+  await page.mouse.up()
+  await page.waitForTimeout(300)
+  const dragAfter = await page.evaluate(() => {
+    const nodes = window.__graphDebug.graph.nodes
+    return { count: nodes.length, last: nodes[nodes.length - 1].pos.map(Math.round) }
+  })
+  check(
+    '拖拽只在画布落点创建节点',
+    dragDuring.count === dragBefore &&
+      dragDuring.highlight &&
+      dragAfter.count === dragBefore + 1 &&
+      Math.abs(dragAfter.last[0] - 310) < 3 &&
+      Math.abs(dragAfter.last[1] - 286) < 3,
+    `拖动中 ${dragDuring.count} / 松手后 ${dragAfter.count} / 位置 ${dragAfter.last}`,
+  )
+
   // ⑫ 新增节点可参与类型校验（LATENT → VAE 非法；LATENT → LATENT 合法）
   // KSampler 的 LATENT 输出在画布可见区域内；EmptyLatent 在右侧，可能被开发面板遮住
   const latentOut = await page
@@ -640,6 +668,239 @@ try {
       JSON.stringify(persistedAfter.pos) === JSON.stringify(persistedBefore.pos),
     `${persistedBefore.nodes} → ${persistedAdded} → 刷新后 ${persistedAfter.nodes}`,
   )
+
+  // ⑳ 主题切换：不丢失图数据，画布底色同步
+  const themeBefore = await page.evaluate(() => ({
+    theme: document.documentElement.dataset.theme,
+    nodes: window.__graphDebug.graph.nodes.length,
+    pos: [...window.__graphDebug.graph.nodes[0].pos],
+    bg: window.__graphDebug.canvas.clear_background_color,
+  }))
+  const themeButton = themeBefore.theme === 'dark' ? '浅色' : '深色'
+  await page.getByRole('button', { name: new RegExp(themeButton) }).click()
+  await page.waitForTimeout(250)
+  const themeAfter = await page.evaluate(() => ({
+    theme: document.documentElement.dataset.theme,
+    nodes: window.__graphDebug.graph.nodes.length,
+    pos: [...window.__graphDebug.graph.nodes[0].pos],
+    bg: window.__graphDebug.canvas.clear_background_color,
+    saved: localStorage.getItem('node-editor:theme'),
+  }))
+  check(
+    '主题切换保持图状态',
+    themeAfter.theme !== themeBefore.theme &&
+      themeAfter.nodes === themeBefore.nodes &&
+      JSON.stringify(themeAfter.pos) === JSON.stringify(themeBefore.pos) &&
+      themeAfter.bg !== themeBefore.bg,
+    `${themeBefore.theme} → ${themeAfter.theme} / 画布 ${themeAfter.bg}`,
+  )
+  check('主题持久化', themeAfter.saved === themeAfter.theme, String(themeAfter.saved))
+
+  // ㉑ LOD：低缩放隐藏文字与 Widget
+  await setView(0.4, 100, 60)
+  await page.waitForTimeout(200)
+  const lod = await page.evaluate(() => ({
+    active: document.querySelector('.node-overlay')?.classList.contains('is-lod') ?? false,
+    widget: getComputedStyle(document.querySelector('.graph-widgets')).display,
+    label: getComputedStyle(document.querySelector('.graph-port-label')).display,
+  }))
+  await setView(1, 0, 0)
+  await page.waitForTimeout(200)
+  const lodOff = await page.evaluate(
+    () => document.querySelector('.node-overlay')?.classList.contains('is-lod') ?? true,
+  )
+  check(
+    '低缩放 LOD 隐藏文字与 Widget',
+    lod.active && lod.widget === 'none' && lod.label === 'none' && lodOff === false,
+    `widget=${lod.widget} label=${lod.label}`,
+  )
+
+  // ㉒ 检查器：选中节点显示详情，取消选中显示空态
+  const samplerBox = await page.locator('.graph-node[data-node-id="2"]').boundingBox()
+  await page.mouse.click(samplerBox.x + samplerBox.width * 0.6, samplerBox.y + 14)
+  await page.waitForTimeout(250)
+  const inspector = await page.evaluate(() => ({
+    title: document.querySelector('.inspector h2')?.textContent ?? '',
+    type: document.querySelector('.inspector .hint')?.textContent ?? '',
+    widgets: document.querySelectorAll('.inspector .graph-widget').length,
+  }))
+  check(
+    '检查器显示选中节点',
+    inspector.title === 'KSampler' && inspector.type === 'sampling/KSampler' && inspector.widgets === 6,
+    `${inspector.title} / ${inspector.widgets} 个参数`,
+  )
+
+  const canvasTopLeft = await page.locator('.graph-canvas').boundingBox()
+  await page.mouse.click(canvasTopLeft.x + 30, canvasTopLeft.y + 30)
+  await page.waitForTimeout(200)
+  const inspectorEmpty = await page.evaluate(() => Boolean(document.querySelector('.inspector-empty')))
+  check('检查器空态', inspectorEmpty, inspectorEmpty ? '未选中提示' : '仍显示节点')
+
+  // ㉓ 迷你地图：节点数量、投影稳定、点击目标点居中、重复点击不漂移
+  const miniBefore = await page.evaluate(() => {
+    const map = document.querySelector('.minimap').getBoundingClientRect()
+    return {
+      exists: Boolean(document.querySelector('.minimap')),
+      nodes: document.querySelectorAll('.minimap-node').length,
+      graphNodes: window.__graphDebug.graph.nodes.length,
+      rects: [...document.querySelectorAll('.minimap-node')].map((el) => {
+        const r = el.getBoundingClientRect()
+        return [Math.round(r.x - map.x), Math.round(r.y - map.y)]
+      }),
+    }
+  })
+  const miniBox = await page.locator('.minimap').boundingBox()
+  const miniClickX = miniBox.x + miniBox.width * 0.7
+  const miniClickY = miniBox.y + miniBox.height * 0.6
+
+  // 与组件相同的投影：把点击位置换算成期望的图坐标
+  const miniTarget = await page.evaluate(
+    ([clientX, clientY]) => {
+      const nodes = window.__graphDebug.graph.nodes
+      const map = document.querySelector('.minimap').getBoundingClientRect()
+      let minX = Math.min(...nodes.map((n) => n.pos[0])) - 80
+      let minY = Math.min(...nodes.map((n) => n.pos[1])) - 80
+      let maxX = Math.max(...nodes.map((n) => n.pos[0] + n.size[0])) + 80
+      let maxY = Math.max(...nodes.map((n) => n.pos[1] + n.size[1])) + 80
+      if (maxX - minX < 1200) {
+        const extra = (1200 - (maxX - minX)) / 2
+        minX -= extra
+        maxX += extra
+      }
+      if (maxY - minY < 800) {
+        const extra = (800 - (maxY - minY)) / 2
+        minY -= extra
+        maxY += extra
+      }
+      const scale = Math.min(200 / (maxX - minX), 130 / (maxY - minY))
+      const offsetX = (200 - (maxX - minX) * scale) / 2
+      const offsetY = (130 - (maxY - minY) * scale) / 2
+      return [minX + (clientX - map.left - 1 - offsetX) / scale, minY + (clientY - map.top - 1 - offsetY) / scale]
+    },
+    [miniClickX, miniClickY],
+  )
+
+  await page.mouse.click(miniClickX, miniClickY)
+  await page.waitForTimeout(300)
+  const miniAfter = await page.evaluate(() => {
+    const api = window.__graphDebug
+    const map = document.querySelector('.minimap').getBoundingClientRect()
+    const canvasRect = api.canvas.canvas.getBoundingClientRect()
+    const viewportRect = document.querySelector('.minimap-viewport').getBoundingClientRect()
+    return {
+      offset: [...api.canvas.ds.offset],
+      center: api.canvas.ds.convertCanvasToOffset([canvasRect.width / 2, canvasRect.height / 2]),
+      rects: [...document.querySelectorAll('.minimap-node')].map((el) => {
+        const r = el.getBoundingClientRect()
+        return [Math.round(r.x - map.x), Math.round(r.y - map.y)]
+      }),
+      viewportCenter: [
+        viewportRect.x + viewportRect.width / 2 - map.x,
+        viewportRect.y + viewportRect.height / 2 - map.y,
+      ],
+    }
+  })
+  const clickBorder = [miniClickX - miniBox.x, miniClickY - miniBox.y]
+  const centerDelta = Math.hypot(miniAfter.center[0] - miniTarget[0], miniAfter.center[1] - miniTarget[1])
+  const markerDelta = Math.hypot(
+    miniAfter.viewportCenter[0] - clickBorder[0],
+    miniAfter.viewportCenter[1] - clickBorder[1],
+  )
+  check(
+    '迷你地图展示并可导航',
+    miniBefore.exists && miniBefore.nodes === miniBefore.graphNodes && miniAfter.offset.some((value) => value !== 0),
+    `${miniBefore.nodes} 个节点`,
+  )
+  check(
+    '点击迷你地图后目标点居中 < 2px',
+    centerDelta < 2,
+    `偏差 ${centerDelta.toFixed(2)}px`,
+  )
+  check(
+    '迷你地图投影不随视口漂移',
+    JSON.stringify(miniAfter.rects) === JSON.stringify(miniBefore.rects) && markerDelta < 2,
+    `节点色块稳定 / 视口标记偏差 ${markerDelta.toFixed(2)}px`,
+  )
+
+  // 同一像素再点一次：已经居中，不应继续移动
+  const offsetAfterFirst = miniAfter.offset
+  await page.mouse.click(miniClickX, miniClickY)
+  await page.waitForTimeout(300)
+  const miniRepeat = await page.evaluate(() => [...window.__graphDebug.canvas.ds.offset])
+  const repeatDelta = Math.hypot(miniRepeat[0] - offsetAfterFirst[0], miniRepeat[1] - offsetAfterFirst[1])
+  check('重复点击同一位置不漂移', repeatDelta < 0.5, `Δ ${repeatDelta.toFixed(2)}px`)
+  await setView(1, 0, 0)
+
+  // ㉔ 无障碍：画布 / 工具按钮 / Widget 均有可访问名称
+  const a11y = await page.evaluate(() => ({
+    canvas: document.querySelector('canvas.litegraph-canvas')?.getAttribute('aria-label'),
+    headerButtons: [...document.querySelectorAll('.header-actions button')].every(
+      (button) => (button.getAttribute('aria-label') ?? button.textContent ?? '').trim().length > 0,
+    ),
+    widget: document
+      .querySelector('.graph-widget input, .graph-widget select')
+      ?.getAttribute('aria-label'),
+  }))
+  check(
+    '无障碍名称完整',
+    a11y.canvas === '节点画布' && a11y.headerButtons && Boolean(a11y.widget),
+    `canvas=${a11y.canvas} widget=${a11y.widget}`,
+  )
+
+  // ㉕ 100 节点渲染性能（canvas.draw 为同步帧，目标 < 20ms/帧）
+  const perf = await page.evaluate(() => {
+    const api = window.__graphDebug
+    const original = api.exportWorkflow()
+    const nodes = Array.from({ length: 100 }, (_, index) => ({
+      id: index + 1,
+      type: 'latent/EmptyLatentImage',
+      pos: [(index % 10) * 260, Math.floor(index / 10) * 200],
+      size: [220, 136],
+      inputs: [],
+      outputs: [],
+      widgets_values: [512, 512, 1],
+    }))
+    const result = api.importWorkflow({ nodes, links: [], config: { schema_version: 1 } })
+    // 缩到 0.3x 让 100 个节点尽量同时可见，测的是真实绘制负载
+    api.setView(0.3, 40, 40)
+    const canvas = api.canvas
+    const start = performance.now()
+    for (let frame = 0; frame < 20; frame++) canvas.draw(true, true)
+    const avg = (performance.now() - start) / 20
+    const count = api.graph.nodes.length
+    api.importWorkflow(original)
+    return { ok: result.ok, avg, count }
+  })
+  check(
+    '100 节点渲染 < 20ms/帧',
+    perf.ok && perf.count === 100 && perf.avg < 20,
+    `${perf.avg.toFixed(1)}ms/帧`,
+  )
+
+  // ㉖ 响应式：1280 与 1920 宽度下布局不溢出
+  for (const width of [1280, 1920]) {
+    const context = await browser.newContext({ viewport: { width, height: 860 } })
+    const probePage = await context.newPage()
+    await probePage.goto(url, { waitUntil: 'networkidle' })
+    await probePage.waitForFunction(() => Boolean(window.__graphDebug))
+    const layout = await probePage.evaluate(() => {
+      const canvas = document.querySelector('.graph-canvas').getBoundingClientRect()
+      const status = document.querySelector('.status-bar').getBoundingClientRect()
+      const header = document.querySelector('.app-header').getBoundingClientRect()
+      const side = document.querySelector('.side-panel').getBoundingClientRect()
+      return {
+        canvasWidth: canvas.width,
+        maxRight: Math.max(status.right, header.right, side.right),
+        innerWidth: window.innerWidth,
+      }
+    })
+    await context.close()
+    check(
+      `${width}px 布局无溢出`,
+      layout.maxRight <= layout.innerWidth + 0.5 && layout.canvasWidth > 400,
+      `画布 ${Math.round(layout.canvasWidth)}px`,
+    )
+  }
 
   check('无页面异常', pageErrors.length === 0, `${pageErrors.length} 个`)
 } finally {

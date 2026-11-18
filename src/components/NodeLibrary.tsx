@@ -39,6 +39,18 @@ export function NodeLibrary({ onAdd }: Props) {
   )
 }
 
+/** 拖拽预览元素：用一个小色块代替整张卡片，避免看起来像“拖着一个节点” */
+let dragGhost: HTMLDivElement | null = null
+
+function getDragGhost(): HTMLDivElement {
+  if (!dragGhost) {
+    dragGhost = document.createElement('div')
+    dragGhost.className = 'node-drag-ghost'
+    document.body.appendChild(dragGhost)
+  }
+  return dragGhost
+}
+
 function LibraryItem({ definition, onAdd }: { definition: NodeDefinition; onAdd: (type: string) => void }) {
   return (
     <button
@@ -50,6 +62,9 @@ function LibraryItem({ definition, onAdd }: { definition: NodeDefinition; onAdd:
       onDragStart={(event) => {
         event.dataTransfer.setData(NODE_DRAG_MIME, definition.type)
         event.dataTransfer.effectAllowed = 'copy'
+        const ghost = getDragGhost()
+        ghost.textContent = definition.title
+        event.dataTransfer.setDragImage(ghost, 14, 14)
       }}
     >
       <span className="node-library-title">{definition.title}</span>
