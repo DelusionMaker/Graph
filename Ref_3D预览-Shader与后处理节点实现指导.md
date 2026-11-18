@@ -1,12 +1,12 @@
 # 3D 预览 · Shader 节点 · 后处理扩展实现指导
 
-> **版本**：v3.0（阶段 0–F 已实现；末尾附实现偏差记录）  
+> **版本**：v3.1（阶段 0–F 已实现；光照与阴影改为节点驱动的自定义 GLSL）  
 > **日期**：2026-11-18  
 > **定位**：`Ref_React-LiteGraph节点面板项目规划.md` 的独立后续功能扩展说明  
 > **技术栈基线**：React 18 + TypeScript + Vite 6 + Zustand 5 + `@comfyorg/litegraph@0.17.2` + R3F v8 系列  
 > **前置依赖（已实现）**：主文档阶段 0–5 已完成（`README.md` 自述）。当前事实：
 > - 桥接层 `src/graph/useLiteGraphBridge.ts` 驱动 LGraph ↔ `useGraphStore` 镜像；`canvas.ds` 是画布视口唯一真相源。
-> - 节点定义拆分为纯数据 `src/graph/nodeDefinitions.ts`（5 个 ComfyUI 节点 + 19 个 shader/postfx 节点），注册在 `nodeRegistry.ts`；端口类型 20 项。
+> - 节点定义拆分为纯数据 `src/graph/nodeDefinitions.ts`（5 个 ComfyUI 节点 + 23 个场景/光照/shader/postfx 节点），注册在 `nodeRegistry.ts`；端口类型 22 项。
 > - 双格式模型 `WorkflowUI` / `PromptAPI`、`parseWorkflow` 三级校验、`toPromptAPI` 已实现；**`SCHEMA_VERSION = 2`**，`migrateWorkflow` 已实现 v1 → v2。
 > - 已落地：`src/graph/coords.ts` 统一坐标转换；桥接层 `commit()` 串联历史/持久化/`invalidateProgram()`；端口文本继续读 `port.name`（不引入 `getPortDisplayText`）。
 > - 已落地：three 0.169 / R3F 8.18 / drei 9.122 / postprocessing 2.19 / `@types/three` 0.169；3D 视口、编译器、后处理、性能 HUD 均可用。
@@ -20,6 +20,7 @@
 | B | 20 个端口类型、19 个新节点、topology、连接校验 | 完成 |
 | C | signature、emitters、PBR/Unlit、compiler、chain、invalidateProgram | 完成 |
 | D | SceneRoot、Lights、PostFXStack、PerfProbe | 完成 |
+| G | 光照节点拆分、自定义 PBR GLSL、独立 depth pass 阴影 | 完成 |
 | E | SceneOverview、Surface/Environment/PostFX 表单、错误标红 | 完成 |
 | F | contextLoss、schema v2 迁移、测试与验收 | 完成 |
 
@@ -44,7 +45,7 @@
 | 编号 | 功能 | 具体交付 |
 |---|---|---|
 | F1 | 左侧 3D 渲染视图 | R3F Canvas；内置几何体（Box / Sphere / TorusKnot）+ GLTF 文件上传；`OrbitControls` 相机控制；实时预览图变化 |
-| F2 | 属性区 shader 配置 | 选中节点后在 Inspector 显示对应参数表单；`render/Environment` 节点暴露光照（环境光/平行光强度、光源位置）与阴影（开关、贴图尺寸、bias）参数 |
+| F2 | 属性区 shader 配置 | 选中节点后在 Inspector 显示对应参数表单；`render/AmbientLight` / `DirectionalLight` / `PointLight` / `LightRig` / `Shadow` 节点暴露光照与阴影参数 |
 | F3 | 材质与 shader 节点 | 颜色、纹理采样、数值常量、数学运算、向量、UV / 法线 / 时间、颜色混合、`material/Surface` 输出 |
 | F4 | 后处理节点 | Bloom、SSAO、Vignette、FXAA 四类效果节点 + `postfx/Output`；支持添加、删除、参数配置与链式连接；结果应用到左侧渲染 |
 | F5 | 性能观察 | FPS / 帧时间 / draw calls / 三角面数实时 HUD；shader 编译状态与错误显示 |
@@ -166,7 +167,7 @@ export type PortType = (typeof PORT_TYPES)[number]
 
 ### 3.2 节点目录（v1 全量）
 
-既有 5 个 ComfyUI 节点（`loaders/CheckpointLoader`、`conditioning/CLIPTextEncode`、`sampling/KSampler`、`latent/EmptyLatentImage`、`image/VAEDecode`）保持不动。以下 19 个为新增，统一注册进 `nodeRegistry.ts`：
+既有 5 个 ComfyUI 节点（`loaders/CheckpointLoader`、`conditioning/CLIPTextEncode`、`sampling/KSampler`、`latent/EmptyLatentImage`、`image/VAEDecode`）保持不动。以下 23 个为新增，统一注册进 `nodeRegistry.ts`：
 
 **场景与材质域**
 
@@ -175,7 +176,11 @@ export type PortType = (typeof PORT_TYPES)[number]
 | `scene/Mesh` | scene | — | `geometry: GEOMETRY` | `shape`(box/sphere/torusknot/gltf), `assetId`, `scale` | 不产出 GLSL；驱动 `SceneRoot` 创建 Mesh |
 | `scene/Root` | scene | `geometry: GEOMETRY`, `material: MATERIAL` | — | — | **终端节点**；场景唯一渲染根 |
 | `material/Surface` | material | `baseColor: COLOR`, `roughness: FLOAT`, `metalness: FLOAT`, `emissive: COLOR` | `material: MATERIAL` | `shading`(pbr/unlit) | 生成 PBR 注入或 ShaderMaterial |
-| `render/Environment` | render | — | — | `ambient`, `dirIntensity`, `lightPosX/Y/Z`, `shadowEnabled`, `shadowMapSize`, `shadowBias` | 不参与 GLSL；驱动 Lights 与 Renderer 配置 |
+| `render/AmbientLight` | render | — | `light: LIGHT` | `color`, `intensity` | 环境光，直接叠加到表面 |
+| `render/DirectionalLight` | render | — | `light: LIGHT` | `color`, `intensity`, `dirX/Y/Z` | 平行光，方向归一化后传入 shader |
+| `render/PointLight` | render | — | `light: LIGHT` | `color`, `intensity`, `posX/Y/Z`, `decay` | 点光，距离衰减 |
+| `render/LightRig` | render | `light1/2/3: LIGHT` | `lights: LIGHTS` | — | 组合最多 3 盏灯 |
+| `render/Shadow` | render | — | — | `enabled`, `mapSize`, `bias`, `softness` | 自定义 depth pass + PCF |
 
 **Shader 值域**
 
@@ -329,11 +334,9 @@ Inspector 的页签状态保留在 `SidePanel.tsx` 组件内部，不新建 stor
 export interface CompiledProgram {
   hash: string                       // signature 的短哈希，用于 ProgramCacheKey
   version: number                    // 每次结构变化 +1
-  injection: {                       // PBR 注入片段
-    color: string                    // 注入 <color_fragment> 之后
-    roughness: string                // 注入 <roughnessmap_fragment> 之后
-    metalness: string                // 注入 <metalnessmap_fragment> 之后
-    emissive: string                 // 注入 <emissivemap_fragment> 之后
+  lighting: {
+    lights: LightDescriptor[]        // 最多 3 盏，来自 LightRig
+    shadow: ShadowSettings | null    // 来自 render/Shadow
   }
   uniformDeclarations: string[]      // 必须注入 GLSL 顶部的 uniform 声明
   uniforms: Record<string, UniformValue>
@@ -343,7 +346,7 @@ export interface CompiledProgram {
     kind: 'float' | 'vec2' | 'vec3' | 'color' | 'time' | 'texture'
   }>
   textureSlots: Array<{ uniform: string; assetId: string; wrap: 'repeat' | 'clamp' | 'mirror'; flipY: boolean }>
-  environment: EnvironmentSettings
+  pbr: { vertexShader: string; fragmentShader: string } | null  // 自定义 PBR shader
   postfxChain: PostFXDescriptor[]
   shading: 'pbr' | 'unlit'
   mesh: { shape: 'box' | 'sphere' | 'torusknot' | 'gltf'; assetId: string; scale: number }
@@ -468,7 +471,7 @@ src/
 │   └── inspector/                   # 新增
 │       ├── SceneOverview.tsx        # 未选中时的场景概览
 │       ├── SurfaceForm.tsx          # material/Surface
-│       ├── EnvironmentForm.tsx      # render/Environment
+│       ├── LightingForm.tsx         # render/* 光照与阴影节点
 │       ├── PostFXForm.tsx           # postfx/*
 │       └── CompileBanner.tsx        # 编译错误首行
 ├── graph/                           # 既有，扩展
@@ -494,10 +497,9 @@ src/
 │   └── glsl/chunks.ts               # 注入片段模板
 ├── viewer/                          # 新增
 │   ├── Viewport3D.tsx               # <Canvas frameloop={...}>
-│   ├── SceneRoot.tsx                # 读编译产物 → Mesh + material
-│   ├── Lights.tsx                   # Environment 节点驱动
+│   ├── SceneRoot.tsx                # Mesh + material + 自定义 depth pass / PCF
 │   ├── ModelAsset.tsx               # 内置几何体 + GLTF 加载 + 失败兜底
-│   ├── material.ts                  # uniform 转换、PBR 注入、Unlit ShaderMaterial
+│   ├── material.ts                  # uniform 转换、PBR / Unlit ShaderMaterial
 │   ├── assets.ts                    # assetId → THREE.Texture/Object3D 映射 + 释放
 │   ├── useViewerStore.ts
 │   ├── requestFrame.ts              # R3F 帧请求封装（避免与数据失效同名）
@@ -691,6 +693,16 @@ src/
 | glTF 材质 | 直接替换 | 替换前记录原材质，清理时先恢复再 dispose | 防止误销毁 SceneRoot 的共享材质 |
 | 调试导出 | 直接 `graphToWorkflow` | 走 `useGraphActions.exportWorkflow()` | 保证导出包含 `shader_extension.viewer` |
 | postfx 效果文件 | `effects/{Bloom,...}.tsx` | 内联在 `PostFXStack.tsx` | 每个效果只有几行 JSX，拆文件收益低 |
+| 光照与阴影 | three 的 `Light` + `MeshStandardMaterial.onBeforeCompile` | 独立光照节点 + 自定义 GGX PBR shader + 自建 depth pass / PCF | 参数与计算完全由节点和 shader 控制，不使用 three 的光照模型 |
+| `render/Environment` | 单一节点配置光照与阴影 | 拆成 Ambient / Directional / Point / LightRig / Shadow 五个节点 | 光照与阴影可独立选择、组合与调参 |
+
+**v3.1 光照实现要点**：
+
+- 端口类型 `LIGHT` / `LIGHTS`，域隔离；`scene/Root` 新增 `lights: LIGHTS` 输入；
+- `compiler.ts` 从 `activeRoot.lights → LightRig → light1/2/3` 收集 `LightDescriptor[]`，未连接灯光组时回退“环境光 + 平行光”；
+- `shader/glsl/chunks.ts` 生成 PBR 顶点/片元 shader：GGX 分布 + Smith 几何 + Schlick 菲涅尔，3 盏灯以定长 uniform 数组传入；
+- `SceneRoot` 自带独立 depth pass（正交光源相机 + `DepthTexture`）， shader 用 3×3 PCF 采样，阴影可开关、调 bias 与软度；
+- 第 9 节 A6 的完整用例已由 `npm run verify:3d` 中“A6 独立光照与阴影节点”替代。
 
 **实现后的验证基线（2026-11-18）**
 

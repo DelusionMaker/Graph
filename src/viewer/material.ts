@@ -1,6 +1,6 @@
 import {
   Color,
-  MeshStandardMaterial,
+  Matrix4,
   ShaderMaterial,
   Vector2,
   Vector3,
@@ -8,15 +8,9 @@ import {
   type Material,
 } from 'three'
 import type { CompiledProgram, UniformValue } from '../shader/compiler'
-import { SHADER_UV_ASSIGN, SHADER_UV_VARYING } from '../shader/glsl/chunks'
 import { applyTextureSettings, resolveTexture } from './assets'
 
-/** onBeforeCompile 提供的 shader 对象中我们实际用到的最小结构 */
-interface CompiledShader {
-  uniforms: Record<string, IUniform>
-  vertexShader: string
-  fragmentShader: string
-}
+const MAX_LIGHTS = 3
 
 function toThreeValue(uniform: UniformValue): unknown {
   const value = uniform.value
@@ -43,6 +37,64 @@ function toThreeValue(uniform: UniformValue): unknown {
   }
 }
 
+/** 把光照描述转成 shader 的定长 uniform 数组 */
+function buildLightUniforms(program: CompiledProgram): Record<string, IUniform> {
+  const lights = program.lighting.lights
+  const types: number[] = []
+  const colors: Vector3[] = []
+  const intensities: number[] = []
+  const directions: Vector3[] = []
+  const positions: Vector3[] = []
+  const decays: number[] = []
+
+  for (let index = 0; index < MAX_LIGHTS; index += 1) {
+    const light = lights[index]
+    if (light) {
+      types.push(light.type === 'ambient' ? 0 : light.type === 'directional' ? 1 : 2)
+      colors.push(new Vector3(...light.color))
+      intensities.push(light.intensity)
+      directions.push(new Vector3(...light.direction))
+      positions.push(new Vector3(...light.position))
+      decays.push(light.decay)
+    } else {
+      types.push(0)
+      colors.push(new Vector3(0, 0, 0))
+      intensities.push(0)
+      directions.push(new Vector3(0, -1, 0))
+      positions.push(new Vector3(0, 0, 0))
+      decays.push(0)
+    }
+  }
+
+  return {
+    u_lightCount: { value: Math.min(lights.length, MAX_LIGHTS) },
+    u_lightType: { value: types },
+    u_lightColor: { value: colors },
+    u_lightIntensity: { value: intensities },
+    u_lightDirection: { value: directions },
+    u_lightPosition: { value: positions },
+    u_lightDecay: { value: decays },
+  }
+}
+
+function buildShadowUniforms(program: CompiledProgram): Record<string, IUniform> {
+  const shadow = program.lighting.shadow
+  const directional = program.lighting.lights.find((light) => light.type === 'directional')
+
+  return {
+    // 未渲染 depth pass 时用白色兜底纹理，采样结果 1 = 完全受光
+    u_shadowMap: { value: resolveTexture('') },
+    u_lightViewProjection: { value: new Matrix4() },
+    u_shadowLightDir: {
+      value: new Vector3(...(directional?.direction ?? [0, -1, 0])),
+    },
+    u_shadowBias: { value: shadow?.bias ?? 0.0015 },
+    u_shadowTexel: { value: 1 / (shadow?.mapSize ?? 1024) },
+    u_shadowSoftness: { value: shadow?.softness ?? 1 },
+    u_shadowEnabled: { value: shadow?.enabled && directional ? 1 : 0 },
+  }
+}
+
 export function buildUniforms(program: CompiledProgram | null): Record<string, IUniform> {
   const uniforms: Record<string, IUniform> = {}
   if (!program) return uniforms
@@ -58,102 +110,50 @@ export function buildUniforms(program: CompiledProgram | null): Record<string, I
     uniforms[slot.uniform] = { value: texture }
   }
 
-  return uniforms
+  return { ...uniforms, ...buildLightUniforms(program), ...buildShadowUniforms(program) }
 }
 
-/** 把 PBR 注入片段写进 three 的 shader 参数 */
-function applyInjection(target: CompiledShader, program: CompiledProgram): void {
-  target.uniforms = { ...target.uniforms, ...buildUniforms(program) }
-
-  // GLSL 侧必须显式声明 uniform，否则注入片段里的 u_<id>_* 是未定义标识符
-  const declarations = program.uniformDeclarations.join('\n')
-  target.vertexShader = `${SHADER_UV_VARYING}\n${target.vertexShader}`.replace(
-    '#include <uv_vertex>',
-    `#include <uv_vertex>\n${SHADER_UV_ASSIGN}`,
-  )
-  target.fragmentShader = `${declarations}\n${SHADER_UV_VARYING}\n${target.fragmentShader}`
-
-  const { injection } = program
-  if (injection.color) {
-    target.fragmentShader = target.fragmentShader.replace(
-      '#include <color_fragment>',
-      `#include <color_fragment>\n${injection.color}`,
-    )
-  }
-  if (injection.roughness) {
-    target.fragmentShader = target.fragmentShader.replace(
-      '#include <roughnessmap_fragment>',
-      `#include <roughnessmap_fragment>\n${injection.roughness}`,
-    )
-  }
-  if (injection.metalness) {
-    target.fragmentShader = target.fragmentShader.replace(
-      '#include <metalnessmap_fragment>',
-      `#include <metalnessmap_fragment>\n${injection.metalness}`,
-    )
-  }
-  if (injection.emissive) {
-    target.fragmentShader = target.fragmentShader.replace(
-      '#include <emissivemap_fragment>',
-      `#include <emissivemap_fragment>\n${injection.emissive}`,
-    )
-  }
+function createFallbackMaterial(): ShaderMaterial {
+  return new ShaderMaterial({
+    vertexShader:
+      'void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: 'void main() { gl_FragColor = vec4(0.55, 0.61, 1.0, 1.0); }',
+  })
 }
 
-/**
- * 创建材质：
- * - PBR：MeshStandardMaterial + onBeforeCompile，customProgramCacheKey 用结构 hash；
- * - Unlit：完整 ShaderMaterial。
- * 材质本身不随结构变化重建，靠 customProgramCacheKey 让 three 重新编译。
- */
-export function createProgramMaterial(
-  program: CompiledProgram | null,
-): MeshStandardMaterial | ShaderMaterial {
-  if (program?.shading === 'unlit' && program.unlit) {
-    return new ShaderMaterial({
-      vertexShader: program.unlit.vertexShader,
-      fragmentShader: program.unlit.fragmentShader,
-      uniforms: buildUniforms(program),
-    })
-  }
+/** PBR 与 Unlit 都走 ShaderMaterial，光照完全由编译产物里的 GLSL 计算 */
+export function createProgramMaterial(program: CompiledProgram | null): ShaderMaterial {
+  if (!program) return createFallbackMaterial()
 
-  const material = new MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 })
-  material.userData.program = program
-  material.onBeforeCompile = (shader) => {
-    const current = material.userData.program as CompiledProgram | null
-    if (current) applyInjection(shader as unknown as CompiledShader, current)
-    material.userData.shader = shader
-  }
-  material.customProgramCacheKey = () =>
-    String((material.userData.program as CompiledProgram | null)?.hash ?? 'default')
+  const source = program.shading === 'unlit' ? program.unlit : program.pbr
+  if (!source) return createFallbackMaterial()
+
+  const material = new ShaderMaterial({
+    vertexShader: source.vertexShader,
+    fragmentShader: source.fragmentShader,
+    uniforms: buildUniforms(program),
+  })
+  material.userData.hash = program.hash
   return material
 }
 
 /**
- * 同步编译产物到已有材质：
- * - uniform-only 变化只改 uniform，不重建材质、不触发重编译；
- * - 结构 hash 变化时置 needsUpdate，由 onBeforeCompile 重新注入。
+ * 同步编译产物：
+ * - 结构 hash 变化时替换 shader 源并触发重编译；
+ * - 仅 uniform / 光照参数变化时只替换 uniforms，不重编译。
  */
 export function syncMaterial(material: Material, program: CompiledProgram | null): void {
-  material.userData.program = program
+  if (!(material instanceof ShaderMaterial) || !program) return
 
-  if (material instanceof ShaderMaterial) {
-    if (!program?.unlit) return
-    material.vertexShader = program.unlit.vertexShader
-    material.fragmentShader = program.unlit.fragmentShader
-    material.uniforms = buildUniforms(program)
-    material.needsUpdate = true
-    return
-  }
+  const source = program.shading === 'unlit' ? program.unlit : program.pbr
+  if (!source) return
 
-  const shader = material.userData.shader as CompiledShader | undefined
-  if (shader && program) {
-    const next = buildUniforms(program)
-    for (const [name, uniform] of Object.entries(next)) shader.uniforms[name] = uniform
-  }
-
-  if (material.userData.hash !== program?.hash) {
-    material.userData.hash = program?.hash
+  if (material.userData.hash !== program.hash) {
+    material.vertexShader = source.vertexShader
+    material.fragmentShader = source.fragmentShader
+    material.userData.hash = program.hash
     material.needsUpdate = true
   }
+
+  material.uniforms = buildUniforms(program)
 }

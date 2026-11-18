@@ -3,14 +3,14 @@ import { useGraphStore } from '../graph/store'
 import { useProgramStore } from '../shader/useProgramStore'
 import { Widget } from './Widget'
 import { CompileBanner } from './inspector/CompileBanner'
-import { EnvironmentForm } from './inspector/EnvironmentForm'
+import { LightingForm } from './inspector/LightingForm'
 import { PostFXForm } from './inspector/PostFXForm'
 import { SceneOverview } from './inspector/SceneOverview'
 import { SurfaceForm } from './inspector/SurfaceForm'
 
 /** 这些类型有专门的表单，通用"参数"区块不再重复渲染 */
 function hasCustomForm(type: string): boolean {
-  return type === 'material/Surface' || type === 'render/Environment' || type.startsWith('postfx/')
+  return type === 'material/Surface' || type.startsWith('render/') || type.startsWith('postfx/')
 }
 
 export function InspectorPanel() {
@@ -31,7 +31,7 @@ export function InspectorPanel() {
       <p className="hint">{node.type}</p>
 
       {node.type === 'material/Surface' && <SurfaceForm node={node} />}
-      {node.type === 'render/Environment' && <EnvironmentForm node={node} />}
+      {node.type.startsWith('render/') && <LightingForm node={node} />}
       {node.type.startsWith('postfx/') && <PostFXForm node={node} />}
 
       <section>

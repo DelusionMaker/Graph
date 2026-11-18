@@ -39,7 +39,7 @@ export interface GraphDebugApi {
     hash: string
     shading: 'pbr' | 'unlit' | null
     mesh: WorkflowProgramSnapshot['mesh'] | null
-    environment: WorkflowProgramSnapshot['environment'] | null
+    lighting: WorkflowProgramSnapshot['lighting'] | null
     postfx: string[]
     warnings: string[]
     errors: Array<{ nodeId?: number; message: string }>
@@ -87,7 +87,7 @@ export function attachDebugApi(graph: LGraph, canvas: LGraphCanvas): () => void 
         hash: state.programHash,
         shading: state.program?.shading ?? null,
         mesh: state.program?.mesh ?? null,
-        environment: state.program?.environment ?? null,
+        lighting: state.program?.lighting ?? null,
         postfx: state.program?.postfxChain.map((item) => item.type) ?? [],
         warnings: state.program?.warnings ?? [],
         errors: state.errors,

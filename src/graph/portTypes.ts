@@ -25,6 +25,9 @@ export const PORT_COLORS: Record<string, string> = {
   GEOMETRY: '#1d9e75',
   MATERIAL: '#ba7517',
   POSTFX: '#378add',
+  // 光照
+  LIGHT: '#f2c55c',
+  LIGHTS: '#e8a33a',
   '*': '#ffffff',
 }
 
@@ -38,7 +41,7 @@ export function isKnownPortType(type: string): type is PortType {
 
 const NUMERIC_TYPES = new Set(['INT', 'FLOAT'])
 /** 资源与终端类型：只允许同类型或 * 互连，实现域隔离 */
-const DOMAIN_TYPES = new Set(['GEOMETRY', 'MATERIAL', 'POSTFX'])
+const DOMAIN_TYPES = new Set(['GEOMETRY', 'MATERIAL', 'POSTFX', 'LIGHT', 'LIGHTS'])
 /** 标量广播：FLOAT 可隐式转 VEC3 / COLOR（FLOAT→VEC2 必须显式用 shader/Vec3） */
 const SCALAR_BROADCAST: Record<string, string[]> = {
   FLOAT: ['VEC3', 'COLOR'],

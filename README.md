@@ -2,7 +2,7 @@
 
 按《React-LiteGraph节点面板项目规划》实现的 Web 节点编辑器，**阶段 0–5 与 3D/Shader 扩展均已完成**。LiteGraph 负责图模型与画布交互，React 渲染节点 DOM、Widget、节点库与外围 UI；数据层支持双格式导入导出、持久化与撤销/重做；视觉层提供双主题、LOD、迷你地图、检查器与响应式布局。
 
-在节点图之上实现了 R3F 3D 预览：`scene/Mesh` + `material/Surface` 经 GLSL 编译器生成 PBR 注入或 Unlit 材质，`postfx/*` 节点组成后处理链，Inspector 可直接调参并实时预览。
+在节点图之上实现了 R3F 3D 预览：`scene/Mesh` + `material/Surface` 经 GLSL 编译器生成自定义 PBR 或 Unlit 材质；`render/AmbientLight` / `DirectionalLight` / `PointLight` 经 `render/LightRig` 接入场景，光照与阴影由自写 GLSL 计算（独立 depth pass + PCF），**不使用 three 内置 Light / shadowMap**；`postfx/*` 节点组成后处理链。
 
 ## 环境
 
@@ -35,7 +35,7 @@ npm test
 ```bash
 npm run verify:canvas      # 画布交互逐项回归
 npm run verify:acceptance  # 阶段 5 全流程验收（示例工作流 / 性能 / 异常路径）
-npm run verify:3d          # 3D / Shader / 后处理验收（33 项）
+npm run verify:3d          # 3D / Shader / 后处理验收（34 项）
 ```
 
 示例工作流见 `examples/`：`text-to-image.workflow.json`（ComfyUI 风格）与 `shader-demo.workflow.json`（3D/Shader）。也可以在应用内点「载入示例」或「载入 3D 示例」直接载入。
@@ -66,12 +66,14 @@ npm run verify:3d          # 3D / Shader / 后处理验收（33 项）
 | 响应式 | 1280px / 1920px 无溢出，窄屏逐级收起检查器与节点库 |
 | 无障碍 | 画布/按钮/Widget 均有可访问名称，键盘焦点可见，尊重 `prefers-reduced-motion` |
 | 3D 预览 | 左栏 R3F 视口；Box / Sphere / TorusKnot / glTF 上传；OrbitControls；相机随工作流保存（schema v2） |
-| Shader 节点 | 20 个端口类型、19 个场景/材质/shader/postfx 节点；PBR 注入与 Unlit 两种模式 |
+| Shader 节点 | 22 个端口类型、23 个场景/材质/光照/shader/后处理节点；自定义 PBR 与 Unlit |
+| 自定义光照 | Ambient / Directional / Point 节点 + LightRig；GGX BRDF 在片元 shader 中计算 |
+| 自定义阴影 | `render/Shadow` + 独立 depth pass + 3×3 PCF；不使用 three 的 Light / shadowMap |
 | 实时编译 | 结构签名区分重编译与 uniform 刷新；编译失败保留上一帧并在节点与 Inspector 标红 |
 | 后处理 | Bloom / SSAO / Vignette / SMAA，按连线顺序执行；空链不渲染 Composer |
 | 资源与性能 | glTF / 贴图上传与释放；FPS / 帧时间 / draw calls / 三角面数 HUD（4Hz） |
 
-内置 24 种节点：5 个 ComfyUI 节点（Checkpoint / CLIP / KSampler / 空潜空间 / VAE 解码）与 19 个场景、材质、shader、渲染、后处理节点。
+内置 28 种节点：5 个 ComfyUI 节点（Checkpoint / CLIP / KSampler / 空潜空间 / VAE 解码）与 23 个场景、材质、光照、shader、后处理节点。
 
 右侧「开发验证」面板可手动测量几何偏差与原生绘制隐藏情况；`window.__graphDebug` 提供同一套测量接口与导入导出/撤销重做入口供自动化脚本调用（仅开发构建挂载）。
 
@@ -91,14 +93,14 @@ npm run verify:3d          # 3D / Shader / 后处理验收（33 项）
 - **无障碍**：画布、工具按钮、Widget 控件均有可访问名称；
 - **稳定性**：无页面异常。
 
-单元测试 `npm test`（Vitest）覆盖 6 个文件 / 53 项：`toPromptAPI` 的连线/静音/Widget 覆盖规则、`parseWorkflow` 的三级校验与索引重建（含 v1 → v2 迁移）、`SnapshotHistory` 的去重/上限/分支截断/合并窗口、编译器的签名/注入/Unlit/错误、后处理链顺序、连接类型矩阵。
+单元测试 `npm test`（Vitest）覆盖 6 个文件 / 56 项：`toPromptAPI` 的连线/静音/Widget 覆盖规则、`parseWorkflow` 的三级校验与索引重建（含 v1 → v2 迁移）、`SnapshotHistory` 的去重/上限/分支截断/合并窗口、编译器的签名/注入/Unlit/错误、后处理链顺序、连接类型矩阵。
 
-`npm run verify:3d` 共 33 项：
+`npm run verify:3d` 共 34 项：
 
 - 几何体切换与工具条 → 节点同步；
 - OrbitControls 相机写回与持久化；
 - uniform-only 更新不改变 `programHash`；
-- Environment 阴影 / 光照实时生效；
+- 独立光照节点与阴影设置实时生效；
 - Bloom / Vignette 链顺序；
 - 编译错误定位、节点标红、保留上一帧；
 - schema v2 导出导入；
@@ -135,6 +137,7 @@ npm run verify:3d          # 3D / Shader / 后处理验收（33 项）
 - 导入只接受 UI 格式（`nodes/links`）；执行格式用于导出，不支持反向还原布局；
 - `shader/Texture` 的贴图通过工具条「贴图」上传并写回第一个 Texture 节点，暂不支持拖拽到指定节点；
 - Surface 的兜底常量在上游连线时被覆盖，Inspector 会显示来源节点；
+- 自定义阴影只取第一盏平行光作为投影光源，点光与环境光不投影；
 - Firefox 的 SSAO 未做能力检测降级；
 - 构建产物约 1.5 MB（three 全量），尚未分包；
 - glTF 动画、骨骼、多材质槽仍属 Out of Scope。
@@ -238,9 +241,9 @@ src/
 │   ├── useProgramStore.ts      # 扁平编译状态
 │   ├── invalidateProgram.ts    # 120ms 防抖 + version token
 │   ├── emitters/               # 节点类型 → GLSL 片段
-│   └── glsl/chunks.ts          # UV varying 与 Unlit 模板
+│   └── glsl/chunks.ts          # PBR 光照 / 阴影 PCF / Unlit / 地面 shader
 ├── viewer/                     # R3F 渲染层
-│   ├── Viewport3D.tsx / SceneRoot.tsx / Lights.tsx
+│   ├── Viewport3D.tsx / SceneRoot.tsx（含自定义 depth pass）
 │   ├── ModelAsset.tsx / material.ts / assets.ts
 │   └── useViewerStore.ts / requestFrame.ts / contextLoss.ts
 ├── postfx/                     # 后处理链

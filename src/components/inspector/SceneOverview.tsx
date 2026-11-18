@@ -1,14 +1,11 @@
 import { useGraphActions } from '../../graph/actions'
-import type { EnvironmentSettings } from '../../shader/compiler'
+import type { LightDescriptor } from '../../shader/compiler'
 import { useProgramStore, type ProgramStatus } from '../../shader/useProgramStore'
 
-const FALLBACK_ENV: EnvironmentSettings = {
-  ambient: 0.7,
-  dirIntensity: 2.2,
-  lightPos: [4, 6, 4],
-  shadowEnabled: true,
-  shadowMapSize: 1024,
-  shadowBias: -0.0005,
+const LIGHT_LABEL: Record<LightDescriptor['type'], string> = {
+  ambient: '环境光',
+  directional: '平行光',
+  point: '点光',
 }
 
 const STATUS_LABEL: Record<ProgramStatus, string> = {
@@ -26,7 +23,7 @@ export function SceneOverview() {
   const errors = useProgramStore((state) => state.errors)
   const lastGood = useProgramStore((state) => state.lastGoodProgram)
   const focusNode = useGraphActions((state) => state.focusNode)
-  const environment = program?.environment ?? FALLBACK_ENV
+  const lighting = program?.lighting
 
   return (
     <div className="inspector scene-overview">
@@ -53,17 +50,24 @@ export function SceneOverview() {
       </section>
 
       <section>
-        <h3>环境</h3>
-        <ul className="stats">
-          <li>环境光：{environment.ambient.toFixed(2)}</li>
-          <li>平行光：{environment.dirIntensity.toFixed(2)}</li>
-          <li>
-            阴影：
-            {environment.shadowEnabled
-              ? `开启（${environment.shadowMapSize}）`
-              : '关闭'}
-          </li>
-        </ul>
+        <h3>光照</h3>
+        {lighting && lighting.lights.length > 0 ? (
+          <ul className="stats">
+            {lighting.lights.map((light, index) => (
+              <li key={`${light.type}-${index}`}>
+                {LIGHT_LABEL[light.type]}：强度 {light.intensity.toFixed(2)}
+              </li>
+            ))}
+            <li>
+              阴影：
+              {lighting.shadow?.enabled
+                ? `开启（${lighting.shadow.mapSize}）`
+                : '关闭'}
+            </li>
+          </ul>
+        ) : (
+          <p className="inspector-none">默认光照（未连接灯光组）</p>
+        )}
       </section>
 
       <section>

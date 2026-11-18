@@ -22,6 +22,7 @@ function buildWorkflow(options = {}) {
     makeNode(2, 'scene/Root', [640, 40], [200, 100], [
       { name: 'geometry', type: 'GEOMETRY', link: 1 },
       { name: 'material', type: 'MATERIAL', link: 4 },
+      { name: 'lights', type: 'LIGHTS', link: 11 },
     ], [], []),
     makeNode(3, 'shader/Color', [40, 240], [180, 100], [], [{ name: 'color', type: 'COLOR', links: [2] }], ['#ff3355']),
     makeNode(4, 'material/Surface', [320, 240], [220, 180], [
@@ -31,13 +32,23 @@ function buildWorkflow(options = {}) {
       { name: 'emissive', type: 'COLOR', link: null },
     ], [{ name: 'material', type: 'MATERIAL', links: [4] }], ['pbr']),
     makeNode(5, 'shader/Float', [40, 480], [160, 100], [], [{ name: 'value', type: 'FLOAT', links: [3] }], [0.25]),
-    makeNode(6, 'render/Environment', [700, 240], [220, 240], [], [], [0.7, 2.2, 4, 6, 4, true, '1024', -0.0005]),
+    makeNode(6, 'render/AmbientLight', [700, 240], [200, 90], [], [{ name: 'light', type: 'LIGHT', links: [9] }], ['#ffffff', 0.5]),
+    makeNode(7, 'render/DirectionalLight', [700, 380], [210, 150], [], [{ name: 'light', type: 'LIGHT', links: [10] }], ['#ffffff', 1.2, -0.5, -1, -0.4]),
+    makeNode(8, 'render/LightRig', [980, 300], [190, 120], [
+      { name: 'light1', type: 'LIGHT', link: 9 },
+      { name: 'light2', type: 'LIGHT', link: 10 },
+      { name: 'light3', type: 'LIGHT', link: null },
+    ], [{ name: 'lights', type: 'LIGHTS', links: [11] }], []),
+    makeNode(9, 'render/Shadow', [980, 480], [200, 150], [], [], [true, '1024', 0.0015, 2]),
   ]
   const links = [
     [1, 1, 0, 2, 0, 'GEOMETRY'],
     [2, 3, 0, 4, 0, 'COLOR'],
     [3, 5, 0, 4, 1, 'FLOAT'],
     [4, 4, 0, 2, 1, 'MATERIAL'],
+    [9, 6, 0, 8, 0, 'LIGHT'],
+    [10, 7, 0, 8, 1, 'LIGHT'],
+    [11, 8, 0, 2, 2, 'LIGHTS'],
   ]
 
   // 后处理链：按传入顺序依次串联，最后接 Output
@@ -233,13 +244,22 @@ check(
 )
 check('Surface 兜底不重编译', state.hash === hashBefore, state.hash)
 
-// ---------- A6 Environment ----------
-await editWidget(6, 'shadowEnabled', false)
+// ---------- A6 独立光照与阴影节点 ----------
+await editWidget(9, 'enabled', false)
 state = await programState()
-check('A6 关闭阴影生效', state.environment?.shadowEnabled === false, String(state.environment?.shadowEnabled))
-await editWidget(6, 'dirIntensity', 6)
+check('A6 关闭阴影生效', state.lighting?.shadow?.enabled === false, String(state.lighting?.shadow?.enabled))
+await editWidget(7, 'intensity', 6)
 state = await programState()
-check('A6 调整平行光强度生效', state.environment?.dirIntensity === 6, String(state.environment?.dirIntensity))
+check(
+  'A6 调整平行光强度生效',
+  state.lighting?.lights?.[1]?.intensity === 6,
+  String(state.lighting?.lights?.[1]?.intensity),
+)
+check(
+  'A6 光照节点数量正确',
+  state.lighting?.lights?.length === 2,
+  String(state.lighting?.lights?.length),
+)
 
 // ---------- A7/A8 后处理链 ----------
 await importWorkflow(buildWorkflow())

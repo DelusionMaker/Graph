@@ -31,6 +31,9 @@ export const PORT_TYPES = [
   'GEOMETRY',
   'MATERIAL',
   'POSTFX',
+  // 光照节点（自定义 shader，不经过 three 的 Light）
+  'LIGHT',
+  'LIGHTS',
 ] as const
 
 export type PortType = (typeof PORT_TYPES)[number]

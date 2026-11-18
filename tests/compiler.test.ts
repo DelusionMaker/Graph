@@ -59,7 +59,7 @@ describe('compileWorkflow', () => {
     const program = compileWorkflow(makeWorkflow([], []))
     expect(program.shading).toBe('pbr')
     expect(program.mesh).toEqual({ shape: 'box', assetId: '', scale: 1 })
-    expect(program.injection.color).toBe('')
+    expect(program.pbr).toBeNull()
     expect(program.unlit).toBeNull()
     expect(program.postfxChain).toEqual([])
   })
@@ -69,8 +69,10 @@ describe('compileWorkflow', () => {
     expect(program.activeRootId).toBe(2)
     expect(program.shading).toBe('pbr')
     expect(program.mesh.shape).toBe('sphere')
-    expect(program.injection.color).toContain('diffuseColor.rgb = u_3_value;')
-    expect(program.injection.roughness).toContain('roughnessFactor = u_5_value;')
+    expect(program.pbr?.fragmentShader).toContain('u_3_value')
+    expect(program.pbr?.fragmentShader).toContain('u_5_value')
+    expect(program.pbr?.fragmentShader).toContain('evaluateLight0')
+    expect(program.pbr?.fragmentShader).toContain('u_lightCount')
 
     const color = program.uniforms.u_3_value.value as number[]
     expect(color[0]).toBeCloseTo(1)
@@ -162,18 +164,46 @@ describe('compileWorkflow', () => {
     }
   })
 
-  it('读取 Environment 参数', () => {
-    const workflow = makeWorkflow([
-      makeNode(1, 'render/Environment', [0.3, 5, 1, 2, 3, false, '2048', 0.001]),
+  it('读取光照节点与阴影设置', () => {
+    const workflow = makeWorkflow(
+      [
+        makeNode(1, 'render/AmbientLight', ['#ffffff', 0.3]),
+        makeNode(2, 'render/DirectionalLight', ['#ff0000', 5, 1, -1, 0]),
+        makeNode(3, 'render/LightRig'),
+        makeNode(4, 'render/Shadow', [true, '2048', 0.001, 2]),
+        makeNode(5, 'scene/Root'),
+        makeNode(6, 'material/Surface', ['pbr']),
+      ],
+      [
+        [1, 1, 0, 3, 0, 'LIGHT'],
+        [2, 2, 0, 3, 1, 'LIGHT'],
+        [3, 3, 0, 5, 2, 'LIGHTS'],
+        [4, 6, 0, 5, 1, 'MATERIAL'],
+      ],
+    )
+    const program = compileWorkflow(workflow)
+
+    expect(program.lighting.lights).toHaveLength(2)
+    expect(program.lighting.lights[0].type).toBe('ambient')
+    expect(program.lighting.lights[0].intensity).toBe(0.3)
+    expect(program.lighting.lights[1].type).toBe('directional')
+    expect(program.lighting.lights[1].intensity).toBe(5)
+    expect(program.lighting.lights[1].direction[1]).toBeCloseTo(-0.707, 2)
+    expect(program.lighting.shadow?.enabled).toBe(true)
+    expect(program.lighting.shadow?.mapSize).toBe(2048)
+    expect(program.lighting.shadow?.softness).toBe(2)
+  })
+
+  it('未连接灯光组时回退默认光照', () => {
+    const program = compileWorkflow(
+      makeWorkflow([makeNode(1, 'scene/Root'), makeNode(2, 'material/Surface', ['pbr'])], [
+        [1, 2, 0, 1, 1, 'MATERIAL'],
+      ]),
+    )
+    expect(program.lighting.lights.map((light) => light.type)).toEqual([
+      'ambient',
+      'directional',
     ])
-    expect(compileWorkflow(workflow).environment).toEqual({
-      ambient: 0.3,
-      dirIntensity: 5,
-      lightPos: [1, 2, 3],
-      shadowEnabled: false,
-      shadowMapSize: 2048,
-      shadowBias: 0.001,
-    })
   })
 
   it('多个 Scene Root 时使用 id 最小者并警告', () => {
@@ -192,8 +222,8 @@ describe('compileWorkflow', () => {
       [[1, 2, 0, 1, 1, 'MATERIAL']],
     )
     const program = compileWorkflow(workflow)
-    expect(program.injection.color).toContain('u_2_baseColor')
-    expect(program.injection.roughness).toContain('u_2_roughness')
+    expect(program.pbr?.fragmentShader).toContain('u_2_baseColor')
+    expect(program.pbr?.fragmentShader).toContain('u_2_roughness')
     expect(program.uniforms.u_2_roughness.value).toBe(0.8)
     expect(program.uniforms.u_2_metalness.value).toBe(0.1)
     expect(program.uniforms.u_2_baseColor.value).toHaveLength(3)

@@ -97,8 +97,8 @@ export const SAMPLE_WORKFLOW: WorkflowUI = {
  * 用于快速验证编译器、材质注入与后处理链。
  */
 export const SHADER_DEMO_WORKFLOW: WorkflowUI = {
-  last_node_id: 7,
-  last_link_id: 5,
+  last_node_id: 11,
+  last_link_id: 8,
   nodes: [
     {
       id: 1,
@@ -122,6 +122,7 @@ export const SHADER_DEMO_WORKFLOW: WorkflowUI = {
       inputs: [
         { name: 'geometry', type: 'GEOMETRY', link: 1 },
         { name: 'material', type: 'MATERIAL', link: 4 },
+        { name: 'lights', type: 'LIGHTS', link: 8 },
       ],
       outputs: [],
       widgets_values: [],
@@ -192,6 +193,58 @@ export const SHADER_DEMO_WORKFLOW: WorkflowUI = {
       widgets_values: [],
       widget_names: [],
     },
+    {
+      id: 8,
+      type: 'render/AmbientLight',
+      title: '环境光',
+      pos: [40, 620],
+      size: [200, 90],
+      mode: 0,
+      inputs: [],
+      outputs: [{ name: 'light', type: 'LIGHT', links: [6] }],
+      widgets_values: ['#ffffff', 0.5],
+      widget_names: ['color', 'intensity'],
+    },
+    {
+      id: 9,
+      type: 'render/DirectionalLight',
+      title: '平行光',
+      pos: [300, 620],
+      size: [210, 150],
+      mode: 0,
+      inputs: [],
+      outputs: [{ name: 'light', type: 'LIGHT', links: [7] }],
+      widgets_values: ['#ffffff', 1.2, -0.5, -1, -0.4],
+      widget_names: ['color', 'intensity', 'dirX', 'dirY', 'dirZ'],
+    },
+    {
+      id: 10,
+      type: 'render/LightRig',
+      title: '灯光组',
+      pos: [600, 620],
+      size: [190, 120],
+      mode: 0,
+      inputs: [
+        { name: 'light1', type: 'LIGHT', link: 6 },
+        { name: 'light2', type: 'LIGHT', link: 7 },
+        { name: 'light3', type: 'LIGHT', link: null },
+      ],
+      outputs: [{ name: 'lights', type: 'LIGHTS', links: [8] }],
+      widgets_values: [],
+      widget_names: [],
+    },
+    {
+      id: 11,
+      type: 'render/Shadow',
+      title: '阴影',
+      pos: [860, 620],
+      size: [200, 150],
+      mode: 0,
+      inputs: [],
+      outputs: [],
+      widgets_values: [true, '1024', 0.0015, 2],
+      widget_names: ['enabled', 'mapSize', 'bias', 'softness'],
+    },
   ],
   links: [
     [1, 1, 0, 2, 0, 'GEOMETRY'],
@@ -199,6 +252,9 @@ export const SHADER_DEMO_WORKFLOW: WorkflowUI = {
     [3, 5, 0, 4, 1, 'FLOAT'],
     [4, 4, 0, 2, 1, 'MATERIAL'],
     [5, 6, 0, 7, 0, 'POSTFX'],
+    [6, 8, 0, 10, 0, 'LIGHT'],
+    [7, 9, 0, 10, 1, 'LIGHT'],
+    [8, 10, 0, 2, 2, 'LIGHTS'],
   ],
   groups: [],
   config: {

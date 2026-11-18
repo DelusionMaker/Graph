@@ -11,7 +11,7 @@ import {
   type UniformSource,
 } from './emitters'
 import { parseColor, readNumber } from './emitters/values'
-import { UNLIT_VERTEX, unlitFragment } from './glsl/chunks'
+import { PBR_VERTEX, UNLIT_VERTEX, pbrFragment, unlitFragment } from './glsl/chunks'
 import { computeSignature } from './signature'
 
 export type MeshShape = 'box' | 'sphere' | 'torusknot' | 'gltf'
@@ -29,31 +29,43 @@ export interface MeshSettings {
   scale: number
 }
 
-export interface EnvironmentSettings {
-  ambient: number
-  dirIntensity: number
-  lightPos: [number, number, number]
-  shadowEnabled: boolean
-  shadowMapSize: 1024 | 2048
-  shadowBias: number
+export type LightType = 'ambient' | 'directional' | 'point'
+
+export interface LightDescriptor {
+  type: LightType
+  /** 线性颜色 */
+  color: [number, number, number]
+  intensity: number
+  /** 平行光方向（指向场景的方向向量） */
+  direction: [number, number, number]
+  /** 点光位置 */
+  position: [number, number, number]
+  /** 点光距离衰减 */
+  decay: number
+}
+
+export interface ShadowSettings {
+  enabled: boolean
+  mapSize: 1024 | 2048
+  bias: number
+  softness: number
+}
+
+export interface LightingSettings {
+  lights: LightDescriptor[]
+  shadow: ShadowSettings | null
 }
 
 export interface CompiledProgram {
-  /** 结构签名短哈希，作为 material.customProgramCacheKey */
+  /** 结构签名短哈希 */
   hash: string
   version: number
-  injection: {
-    color: string
-    roughness: string
-    metalness: string
-    emissive: string
-  }
   uniformDeclarations: string[]
   uniforms: Record<string, UniformValue>
   /** uniform 名 → 取值来源，用于仅 uniform 变化时免重编译刷新 */
   uniformSources: Record<string, UniformSource>
   textureSlots: TextureSlot[]
-  environment: EnvironmentSettings
+  lighting: LightingSettings
   postfxChain: PostFXDescriptor[]
   shading: 'pbr' | 'unlit'
   mesh: MeshSettings
@@ -61,6 +73,7 @@ export interface CompiledProgram {
   meshFromNode: boolean
   activeRootId: number | null
   activeOutputId: number | null
+  pbr: { vertexShader: string; fragmentShader: string } | null
   unlit: { vertexShader: string; fragmentShader: string } | null
   warnings: string[]
 }
@@ -140,31 +153,112 @@ function readMesh(workflow: WorkflowUI, rootId: number | null): MeshSettings | n
   }
 }
 
-function readEnvironment(workflow: WorkflowUI): EnvironmentSettings {
-  const fallback: EnvironmentSettings = {
-    ambient: 0.7,
-    dirIntensity: 2.2,
-    lightPos: [4, 6, 4],
-    shadowEnabled: true,
-    shadowMapSize: 1024,
-    shadowBias: -0.0005,
+/** 未连接灯光组时的默认光照，保证空图也能看到模型 */
+const DEFAULT_LIGHTS: LightDescriptor[] = [
+  {
+    type: 'ambient',
+    color: [1, 1, 1],
+    intensity: 0.45,
+    direction: [0, -1, 0],
+    position: [0, 0, 0],
+    decay: 0,
+  },
+  {
+    type: 'directional',
+    color: [1, 1, 1],
+    intensity: 1.2,
+    direction: [-0.45, -0.89, -0.36],
+    position: [0, 0, 0],
+    decay: 0,
+  },
+]
+
+function normalizeDirection(x: number, y: number, z: number): [number, number, number] {
+  const length = Math.hypot(x, y, z)
+  if (length < 1e-5) return [0, -1, 0]
+  return [x / length, y / length, z / length]
+}
+
+/** 读取单个光照节点的 widget，生成 shader 用的描述 */
+function readLightNode(node: UINode): LightDescriptor | null {
+  const color = parseColor(readWidgetValue(node, 'color'))
+  const intensity = readNumber(readWidgetValue(node, 'intensity'), 1)
+
+  switch (node.type) {
+    case 'render/AmbientLight':
+      return {
+        type: 'ambient',
+        color,
+        intensity,
+        direction: [0, -1, 0],
+        position: [0, 0, 0],
+        decay: 0,
+      }
+    case 'render/DirectionalLight':
+      return {
+        type: 'directional',
+        color,
+        intensity,
+        direction: normalizeDirection(
+          readNumber(readWidgetValue(node, 'dirX'), -0.5),
+          readNumber(readWidgetValue(node, 'dirY'), -1),
+          readNumber(readWidgetValue(node, 'dirZ'), -0.4),
+        ),
+        position: [0, 0, 0],
+        decay: 0,
+      }
+    case 'render/PointLight':
+      return {
+        type: 'point',
+        color,
+        intensity,
+        direction: [0, -1, 0],
+        position: [
+          readNumber(readWidgetValue(node, 'posX'), 2),
+          readNumber(readWidgetValue(node, 'posY'), 2),
+          readNumber(readWidgetValue(node, 'posZ'), 2),
+        ],
+        decay: readNumber(readWidgetValue(node, 'decay'), 2),
+      }
+    default:
+      return null
+  }
+}
+
+/** Scene Root.lights → LightRig → 最多 3 盏灯 */
+function readLights(
+  root: UINode | null,
+  linkByTarget: Map<string, UILink>,
+  nodeById: Map<number, UINode>,
+  warnings: string[],
+): LightDescriptor[] {
+  if (!root) return DEFAULT_LIGHTS
+
+  const rig = findUpstream(root, 'lights', linkByTarget, nodeById)
+  if (!rig || rig.type !== 'render/LightRig') return DEFAULT_LIGHTS
+
+  const lights: LightDescriptor[] = []
+  for (const name of ['light1', 'light2', 'light3']) {
+    const node = findUpstream(rig, name, linkByTarget, nodeById)
+    if (!node) continue
+
+    const light = readLightNode(node)
+    if (light) lights.push(light)
+    else warnings.push(`灯光组输入 ${name} 来自 ${node.type}，已忽略`)
   }
 
-  const node = workflow.nodes.find((item) => item.type === 'render/Environment')
-  if (!node) return fallback
+  return lights.length > 0 ? lights : DEFAULT_LIGHTS
+}
 
-  const mapSize = Number(readWidgetValue(node, 'shadowMapSize'))
+function readShadow(workflow: WorkflowUI): ShadowSettings | null {
+  const node = workflow.nodes.find((item) => item.type === 'render/Shadow')
+  if (!node) return null
+
   return {
-    ambient: readNumber(readWidgetValue(node, 'ambient'), fallback.ambient),
-    dirIntensity: readNumber(readWidgetValue(node, 'dirIntensity'), fallback.dirIntensity),
-    lightPos: [
-      readNumber(readWidgetValue(node, 'lightPosX'), fallback.lightPos[0]),
-      readNumber(readWidgetValue(node, 'lightPosY'), fallback.lightPos[1]),
-      readNumber(readWidgetValue(node, 'lightPosZ'), fallback.lightPos[2]),
-    ],
-    shadowEnabled: readWidgetValue(node, 'shadowEnabled') !== false,
-    shadowMapSize: mapSize === 2048 ? 2048 : 1024,
-    shadowBias: readNumber(readWidgetValue(node, 'shadowBias'), fallback.shadowBias),
+    enabled: readWidgetValue(node, 'enabled') !== false,
+    mapSize: Number(readWidgetValue(node, 'mapSize')) === 2048 ? 2048 : 1024,
+    bias: readNumber(readWidgetValue(node, 'bias'), 0.0015),
+    softness: Math.max(1, Math.min(4, Math.round(readNumber(readWidgetValue(node, 'softness'), 1)))),
   }
 }
 
@@ -254,14 +348,10 @@ export function compileWorkflow(workflow: WorkflowUI): CompiledProgram {
   }
 
   const shading = surface?.shading ?? 'pbr'
-  const injection = surface
-    ? {
-        color: `diffuseColor.rgb = ${surface.color};`,
-        roughness: `roughnessFactor = ${surface.roughness};`,
-        metalness: `metalnessFactor = ${surface.metalness};`,
-        emissive: `totalEmissiveRadiance = ${surface.emissive};`,
-      }
-    : { color: '', roughness: '', metalness: '', emissive: '' }
+  const pbr =
+    surface && shading === 'pbr'
+      ? { vertexShader: PBR_VERTEX, fragmentShader: pbrFragment(declarations, surface) }
+      : null
 
   const unlit =
     shading === 'unlit' && surface
@@ -276,18 +366,21 @@ export function compileWorkflow(workflow: WorkflowUI): CompiledProgram {
   return {
     hash: computeSignature(workflow),
     version: 0,
-    injection,
     uniformDeclarations: declarations,
     uniforms,
     uniformSources,
     textureSlots,
-    environment: readEnvironment(workflow),
+    lighting: {
+      lights: readLights(activeRoot, linkByTarget, nodeById, warnings),
+      shadow: readShadow(workflow),
+    },
     postfxChain: collectPostFXChain(workflow, activeOutput?.id ?? null),
     shading,
     mesh: meshSettings ?? { shape: 'box', assetId: '', scale: 1 },
     meshFromNode: meshSettings !== null,
     activeRootId: activeRoot?.id ?? null,
     activeOutputId: activeOutput?.id ?? null,
+    pbr,
     unlit,
     warnings,
   }
@@ -326,13 +419,19 @@ export function refreshProgram(workflow: WorkflowUI, previous: CompiledProgram):
   }
 
   const meshSettings = readMesh(workflow, previous.activeRootId)
+  const { nodeById, linkByTarget } = indexWorkflow(workflow)
+  const root =
+    previous.activeRootId != null ? nodeById.get(previous.activeRootId) ?? null : null
 
   return {
     ...previous,
     uniforms,
     mesh: meshSettings ?? previous.mesh,
     meshFromNode: meshSettings !== null,
-    environment: readEnvironment(workflow),
+    lighting: {
+      lights: readLights(root, linkByTarget, nodeById, []),
+      shadow: readShadow(workflow),
+    },
     postfxChain: collectPostFXChain(workflow, previous.activeOutputId),
   }
 }

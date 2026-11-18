@@ -8,7 +8,6 @@ import { PostFXStack } from '../postfx/PostFXStack'
 import { invalidateProgram } from '../shader/invalidateProgram'
 import { useProgramStore } from '../shader/useProgramStore'
 import { installContextLossHandling } from './contextLoss'
-import { Lights } from './Lights'
 import { useRequestFrame } from './requestFrame'
 import { SceneRoot } from './SceneRoot'
 import { useViewerStore } from './useViewerStore'
@@ -43,14 +42,7 @@ export function Viewport3D() {
       >
         <color attach="background" args={[background]} />
 
-        <Lights />
         <SceneRoot />
-
-        {/* 阴影承接面只显示阴影，不参与"单 Mesh + 单材质"的节点图约束 */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.2, 0]} receiveShadow>
-          <planeGeometry args={[20, 20]} />
-          <shadowMaterial transparent opacity={0.28} />
-        </mesh>
 
         <PostFXStack />
         <PerfProbe />
