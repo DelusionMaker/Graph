@@ -1,4 +1,5 @@
 import type { LGraph, LGraphCanvas } from '@comfyorg/litegraph'
+import { useGraphActions } from './actions'
 import {
   measureNativeDrawing,
   measureNodeBoxes,
@@ -7,6 +8,9 @@ import {
   type NativeMeasurement,
   type PortMeasurement,
 } from './measure'
+import { writePersistedWorkflow } from './persistence'
+import { graphToWorkflow } from './serialize'
+import { toPromptAPI, type ImportIssue, type PromptAPI, type WorkflowUI } from './workflow'
 
 /**
  * 开发期调试接口：只用于手动排查与 E2E 脚本。
@@ -20,6 +24,14 @@ export interface GraphDebugApi {
   measurePorts: () => PortMeasurement[]
   measureNodeBoxes: () => BoxMeasurement[]
   measureNativeDrawing: () => NativeMeasurement | null
+  exportWorkflow: () => WorkflowUI
+  exportPrompt: () => PromptAPI
+  importWorkflow: (raw: unknown) => { ok: boolean; issues: ImportIssue[] }
+  undo: () => void
+  redo: () => void
+  historyState: () => { canUndo: boolean; canRedo: boolean }
+  /** 立即写入 localStorage，跳过 1s 防抖（仅测试使用） */
+  saveNow: () => void
 }
 
 declare global {
@@ -42,6 +54,16 @@ export function attachDebugApi(graph: LGraph, canvas: LGraphCanvas): () => void 
     measurePorts: () => measurePorts(graph, canvas),
     measureNodeBoxes: () => measureNodeBoxes(graph, canvas),
     measureNativeDrawing: () => measureNativeDrawing(graph, canvas),
+    exportWorkflow: () => graphToWorkflow(graph),
+    exportPrompt: () => toPromptAPI(graphToWorkflow(graph)),
+    importWorkflow: (raw) => useGraphActions.getState().importWorkflow(raw),
+    undo: () => useGraphActions.getState().undo(),
+    redo: () => useGraphActions.getState().redo(),
+    historyState: () => {
+      const state = useGraphActions.getState()
+      return { canUndo: state.canUndo, canRedo: state.canRedo }
+    },
+    saveNow: () => writePersistedWorkflow(graphToWorkflow(graph)),
   }
 
   window.__graphDebug = api

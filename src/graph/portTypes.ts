@@ -1,20 +1,6 @@
-import { LGraphCanvas, LiteGraph } from '@comfyorg/litegraph'
+import { PORT_TYPES, type PortType } from './workflow'
 
-export type PortType =
-  | 'MODEL'
-  | 'CLIP'
-  | 'VAE'
-  | 'CONDITIONING'
-  | 'LATENT'
-  | 'IMAGE'
-  | 'MASK'
-  | 'CONTROL_NET'
-  | 'SIGMAS'
-  | 'INT'
-  | 'FLOAT'
-  | 'STRING'
-  | 'BOOLEAN'
-  | '*'
+export type { PortType }
 
 /** 端口类型 → 颜色，React 端口圆点与 LiteGraph 连线共用同一份 */
 export const PORT_COLORS: Record<string, string> = {
@@ -38,27 +24,23 @@ export function portColor(type: string): string {
   return PORT_COLORS[type] ?? PORT_COLORS.INT
 }
 
-/** INT ↔ FLOAT 允许互连（执行时按数值转换），其余按 LiteGraph 原生规则 */
+export function isKnownPortType(type: string): type is PortType {
+  return (PORT_TYPES as readonly string[]).includes(type)
+}
+
 const NUMERIC_TYPES = new Set(['INT', 'FLOAT'])
 
-let installed = false
-
 /**
- * 安装端口类型系统：
- * 1. 覆写 `LiteGraph.isValidConnection`，在原生规则（相等 / 通配 / 逗号列表）之上加入 INT↔FLOAT；
- * 2. 同步连线颜色，保证连线与 React 端口颜色一致。
+ * 纯函数版连接校验：相等 / 通配 / 逗号分隔的联合类型 / INT↔FLOAT。
+ * LiteGraph 原生规则在此基础上由 `installTypeSystem` 兜底。
  */
-export function installTypeSystem(): void {
-  if (installed) return
-  installed = true
-
-  const original = LiteGraph.isValidConnection.bind(LiteGraph)
-  LiteGraph.isValidConnection = (typeA, typeB) => {
-    const a = String(typeA ?? '').toUpperCase()
-    const b = String(typeB ?? '').toUpperCase()
-    if (a !== b && NUMERIC_TYPES.has(a) && NUMERIC_TYPES.has(b)) return true
-    return original(typeA, typeB)
-  }
-
-  Object.assign(LGraphCanvas.link_type_colors, PORT_COLORS)
+export function isValidTypePair(a: string, b: string): boolean {
+  const left = (a ?? '').trim().toUpperCase()
+  const right = (b ?? '').trim().toUpperCase()
+  if (!left || !right) return true
+  if (left === right || left === '*' || right === '*') return true
+  if (NUMERIC_TYPES.has(left) && NUMERIC_TYPES.has(right)) return true
+  const leftTypes = left.split(',').map((type) => type.trim())
+  const rightTypes = right.split(',').map((type) => type.trim())
+  return leftTypes.some((type) => rightTypes.includes(type))
 }

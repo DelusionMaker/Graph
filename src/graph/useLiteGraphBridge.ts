@@ -1,10 +1,15 @@
 import { useEffect, useState, type RefObject } from 'react'
 import { LGraph, LGraphCanvas, LGraphNode, LiteGraph, type LLink } from '@comfyorg/litegraph'
 import '@comfyorg/litegraph/style.css'
-import { useGraphActions } from './actions'
+import { resetGraphActions, useGraphActions } from './actions'
+import { SnapshotHistory } from './history'
 import { getNodeDefinition, registerNodeDefinitions } from './nodeRegistry'
-import { installTypeSystem } from './portTypes'
+import { readPersistedWorkflow, writePersistedWorkflow } from './persistence'
+import { seedDemoGraph } from './seed'
+import { applyWorkflow, graphToWorkflow } from './serialize'
 import { useGraphStore } from './store'
+import { installTypeSystem } from './typeSystem'
+import { parseWorkflow, toPromptAPI, type ImportIssue, type WorkflowUI } from './workflow'
 import type {
   LinkSnapshot,
   NodeGeometryUpdate,
@@ -41,6 +46,8 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
     // 0.17.2：第三个参数是 options 对象，仅支持 skip_events / viewport / skip_render / autoresize
     const canvas = new LGraphCanvas(element, graph, { autoresize: true })
     canvas.render_shadows = false
+    // 关闭 FPS/节点计数调试信息（默认会画在画布左下角）
+    canvas.show_info = false
 
     // 关闭原生节点绘制：只 arrange() 维持槽位坐标，不画节点本体
     canvas.drawNode = (node) => {
@@ -156,6 +163,69 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
         syncSnapshot()
         syncViewport()
       })
+    }
+
+    // ---- 历史 / 持久化 / 导入导出 ----
+    const AUTOSAVE_DELAY = 1000
+    const history = new SnapshotHistory({ limit: 50, coalesceWindowMs: 600 })
+    let autosaveTimer = 0
+
+    const snapshotGraph = () => JSON.stringify(graphToWorkflow(graph))
+    const persistNow = () => writePersistedWorkflow(graphToWorkflow(graph))
+    const queueAutosave = () => {
+      window.clearTimeout(autosaveTimer)
+      autosaveTimer = window.setTimeout(persistNow, AUTOSAVE_DELAY)
+    }
+    const syncHistoryFlags = () => {
+      useGraphActions.setState({ canUndo: history.canUndo, canRedo: history.canRedo })
+    }
+    // 重建图（撤销/重做/导入/启动恢复）期间必须暂停记录，
+    // 否则 graph.clear() 与逐节点 add 会把中间态写进历史
+    let suspendHistory = false
+    const commit = (options?: { coalesce?: boolean }) => {
+      if (suspendHistory) return
+      if (history.push(snapshotGraph(), options)) queueAutosave()
+      syncHistoryFlags()
+    }
+
+    const rebuild = (workflow: WorkflowUI) => {
+      suspendHistory = true
+      try {
+        clearLinkSelection()
+        const issues = applyWorkflow(graph, canvas, workflow)
+        syncSnapshot()
+        syncViewport()
+        return issues
+      } finally {
+        suspendHistory = false
+      }
+    }
+
+    const applySnapshot = (snapshot: string) => {
+      const { workflow } = parseWorkflow(JSON.parse(snapshot))
+      if (!workflow) return
+      rebuild(workflow)
+      queueAutosave()
+    }
+    const undo = () => {
+      const snapshot = history.undo()
+      if (snapshot) applySnapshot(snapshot)
+      syncHistoryFlags()
+    }
+    const redo = () => {
+      const snapshot = history.redo()
+      if (snapshot) applySnapshot(snapshot)
+      syncHistoryFlags()
+    }
+
+    const exportWorkflow = () => graphToWorkflow(graph)
+    const exportPrompt = () => toPromptAPI(graphToWorkflow(graph))
+    const importWorkflow = (raw: unknown): { ok: boolean; issues: ImportIssue[] } => {
+      const { workflow, issues } = parseWorkflow(raw)
+      if (!workflow) return { ok: false, issues }
+      const applyIssues = rebuild(workflow)
+      commit()
+      return { ok: true, issues: [...issues, ...applyIssues] }
     }
 
     // 拖动/缩放节点时实时同步几何：原生节点绘制已关闭，
@@ -274,6 +344,8 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
     const onPointerUp = (event: PointerEvent) => {
       scheduleSync()
       store.setSelectionRect(null)
+      // 拖拽 / 缩放 / 连线结束都落一条历史记录；仅选中节点时快照不变，push 会自动去重
+      commit()
       // 只有"点击"才切换连线选中，避免拖拽结束时误选脚下的连线
       const isClick =
         pointerDownButton === 0 && Math.hypot(event.clientX - pointerDownX, event.clientY - pointerDownY) < 4
@@ -286,13 +358,39 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
         clearLinkSelection()
       }
     }
+    const isEditableTarget = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null
+      if (!el) return false
+      return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable
+    }
+
     const onKeyDown = (event: KeyboardEvent) => {
+      // 焦点在 Widget 控件里时，快捷键交还给浏览器（例如输入框内的撤销）
+      if (isEditableTarget(event.target)) return
+
+      const modifier = event.ctrlKey || event.metaKey
+      const key = event.key.toLowerCase()
+      if (modifier && key === 'z') {
+        event.preventDefault()
+        if (event.shiftKey) redo()
+        else undo()
+        return
+      }
+      if (modifier && key === 'y') {
+        event.preventDefault()
+        redo()
+        return
+      }
+
       if (event.key !== 'Delete' && event.key !== 'Backspace') return
       if (selectedLink) {
         // 删除选中的连线；同步走 rAF，等 LiteGraph 自己的按键处理结束
         graph.removeLink(selectedLink.id)
         selectedLink = null
         canvas.setDirty(true, true)
+        scheduleSync()
+        commit()
+        return
       }
       scheduleSync()
     }
@@ -315,8 +413,14 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
     // 但滚轮仍应以光标为锚点缩放画布
     const wheelTarget = element.parentElement ?? element
 
-    graph.onNodeAdded = scheduleSync
-    graph.onNodeRemoved = scheduleSync
+    graph.onNodeAdded = () => {
+      scheduleSync()
+      commit()
+    }
+    graph.onNodeRemoved = () => {
+      scheduleSync()
+      commit()
+    }
     canvas.onSelectionChange = scheduleSync
 
     // LiteGraph 的 Pointer 在 canvas 的 capture 阶段会 stopImmediatePropagation，冒泡阶段收不到 pointerdown，
@@ -352,13 +456,46 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
       ;(widget as { value: unknown }).value = value
       canvas.setDirty(true, true)
       scheduleSync()
+      // 连续调参合并为一条历史记录
+      commit({ coalesce: true })
     }
 
     // UI 只通过这些动作访问图引擎，不直接持有 LGraph
-    useGraphActions.setState({ addNode, setWidgetValue })
+    useGraphActions.setState({
+      addNode,
+      setWidgetValue,
+      undo,
+      redo,
+      exportWorkflow,
+      exportPrompt,
+      importWorkflow,
+      canUndo: false,
+      canRedo: false,
+    })
+
+    // 启动：优先恢复本地工作流，没有或数据损坏时写入示例图
+    let restored = false
+    const persisted = readPersistedWorkflow()
+    if (persisted) {
+      const { workflow } = parseWorkflow(persisted)
+      if (workflow && workflow.nodes.length > 0) {
+        rebuild(workflow)
+        restored = true
+      }
+    }
+    if (!restored) {
+      suspendHistory = true
+      try {
+        seedDemoGraph(graph)
+      } finally {
+        suspendHistory = false
+      }
+    }
 
     syncSnapshot()
     syncViewport()
+    history.reset(snapshotGraph())
+    syncHistoryFlags()
     setContext({ graph, canvas, addNode })
 
     return () => {
@@ -371,8 +508,9 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
 
       cancelAnimationFrame(syncFrame)
       cancelAnimationFrame(positionFrame)
+      window.clearTimeout(autosaveTimer)
       clearLinkSelection()
-      useGraphActions.setState({ addNode: () => {}, setWidgetValue: () => {} })
+      resetGraphActions()
 
       graph.onNodeAdded = undefined
       graph.onNodeRemoved = undefined

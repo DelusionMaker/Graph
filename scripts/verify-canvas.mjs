@@ -477,6 +477,170 @@ try {
   const validLinks = await page.evaluate(() => window.__graphDebug.graph.links.size)
   check('同类型连接正常建立', validLinks === 1, `${validLinks} 条`)
 
+  // ⑬ 撤销 / 重做：连线
+  const undoRedo = await page.evaluate(async () => {
+    const api = window.__graphDebug
+    const before = api.graph.links.size
+    api.undo()
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    const afterUndo = api.graph.links.size
+    api.redo()
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    return { before, afterUndo, afterRedo: api.graph.links.size }
+  })
+  check(
+    '撤销/重做恢复连线',
+    undoRedo.before === 1 && undoRedo.afterUndo === 0 && undoRedo.afterRedo === 1,
+    `${undoRedo.before} → ${undoRedo.afterUndo} → ${undoRedo.afterRedo}`,
+  )
+
+  // ⑭ 撤销 / 重做：节点增删
+  const nodesBeforeAdd = await page.evaluate(() => window.__graphDebug.graph.nodes.length)
+  await page.getByRole('button', { name: /VAE 解码/ }).click()
+  await page.waitForTimeout(200)
+  const nodesAfterAdd = await page.evaluate(() => window.__graphDebug.graph.nodes.length)
+  await page.evaluate(() => window.__graphDebug.undo())
+  await page.waitForTimeout(200)
+  const nodesAfterUndo = await page.evaluate(() => window.__graphDebug.graph.nodes.length)
+  await page.evaluate(() => window.__graphDebug.redo())
+  await page.waitForTimeout(200)
+  const nodesAfterRedo = await page.evaluate(() => window.__graphDebug.graph.nodes.length)
+  check(
+    '撤销/重做恢复节点增删',
+    nodesAfterAdd === nodesBeforeAdd + 1 && nodesAfterUndo === nodesBeforeAdd && nodesAfterRedo === nodesAfterAdd,
+    `${nodesBeforeAdd} → ${nodesAfterAdd} → ${nodesAfterUndo} → ${nodesAfterRedo}`,
+  )
+
+  // ⑮ Widget 变更的撤销（连续调参合并为一条）+ Ctrl+Z 快捷键
+  const stepsLocator = page.locator('.graph-node[data-node-id="2"] .graph-widget[data-widget-name="steps"] input')
+  await stepsLocator.fill('42')
+  await page.waitForTimeout(200)
+  await page.evaluate(() => window.__graphDebug.undo())
+  await page.waitForTimeout(200)
+  const stepsAfterUndo = await stepsLocator.inputValue()
+  await page.evaluate(() => window.__graphDebug.redo())
+  await page.waitForTimeout(200)
+  const stepsAfterRedo = await stepsLocator.inputValue()
+  check(
+    'Widget 变更可撤销/重做',
+    stepsAfterUndo === '30' && stepsAfterRedo === '42',
+    `30 → 42 → ${stepsAfterUndo} → ${stepsAfterRedo}`,
+  )
+
+  // 让 canvas 获得焦点后使用键盘快捷键撤销
+  const focusPoint = await page.locator('.graph-canvas').boundingBox()
+  await page.mouse.click(focusPoint.x + 30, focusPoint.y + 30)
+  await page.waitForTimeout(150)
+  await page.keyboard.press('Control+z')
+  await page.waitForTimeout(300)
+  check('Ctrl+Z 快捷键撤销', (await stepsLocator.inputValue()) === '30', `steps=${await stepsLocator.inputValue()}`)
+  await page.evaluate(() => window.__graphDebug.redo())
+  await page.waitForTimeout(200)
+
+  // ⑯ 导出 → 导入 往返一致
+  const roundTrip = await page.evaluate(() => {
+    const api = window.__graphDebug
+    const exported = api.exportWorkflow()
+    const result = api.importWorkflow(exported)
+    const normalize = (workflow) => ({
+      nodes: workflow.nodes
+        .map((node) => ({
+          id: node.id,
+          type: node.type,
+          pos: node.pos,
+          size: node.size,
+          inputs: node.inputs.map((port) => [port.name, port.type, port.link ?? null]),
+          outputs: node.outputs.map((port) => [port.name, port.type]),
+          widgets: node.widgets_values,
+        }))
+        .sort((left, right) => left.id - right.id),
+      links: workflow.links
+        .map((link) => [link[1], link[2], link[3], link[4], link[5]])
+        .sort((left, right) => String(left).localeCompare(String(right))),
+    })
+    return {
+      ok: result.ok,
+      issues: result.issues,
+      before: JSON.stringify(normalize(exported)),
+      after: JSON.stringify(normalize(api.exportWorkflow())),
+    }
+  })
+  check(
+    '导出再导入后图结构一致',
+    roundTrip.ok && roundTrip.before === roundTrip.after,
+    roundTrip.ok ? `issues ${roundTrip.issues.length}` : '导入被拒绝',
+  )
+
+  // ⑰ 执行格式：连线写成 [源节点 id, 槽位]，widget 值映射为具名输入
+  const promptCheck = await page.evaluate(() => {
+    const api = window.__graphDebug
+    const sampler = api.graph.nodes.find((node) => node.type === 'sampling/KSampler')
+    const vae = api.graph.nodes.find((node) => node.type === 'image/VAEDecode')
+    if (!sampler || !vae) return null
+    const prompt = api.exportPrompt()
+    const samplerPrompt = prompt[String(sampler.id)]
+    const vaePrompt = prompt[String(vae.id)]
+    return {
+      samplerId: Number(sampler.id),
+      vaeLatent: vaePrompt?.inputs?.LATENT,
+      samplerClass: samplerPrompt?.class_type,
+      steps: samplerPrompt?.inputs?.steps,
+      hasSeed: 'seed' in (samplerPrompt?.inputs ?? {}),
+    }
+  })
+  check(
+    '执行格式：连线与 Widget 值正确',
+    promptCheck !== null &&
+      promptCheck.samplerClass === 'sampling/KSampler' &&
+      JSON.stringify(promptCheck.vaeLatent) === JSON.stringify([promptCheck.samplerId, 0]) &&
+      typeof promptCheck.steps === 'number' &&
+      promptCheck.hasSeed,
+    promptCheck ? `LATENT=${JSON.stringify(promptCheck.vaeLatent)} steps=${promptCheck.steps}` : '缺少节点',
+  )
+
+  // ⑱ 非法导入被拒绝且不破坏当前图
+  const invalidImport = await page.evaluate(() => {
+    const api = window.__graphDebug
+    const before = api.graph.nodes.length
+    const result = api.importWorkflow({ nodes: 'oops' })
+    return { ok: result.ok, level: result.issues[0]?.level, before, after: api.graph.nodes.length }
+  })
+  check(
+    '非法导入被拒绝且图不变',
+    invalidImport.ok === false && invalidImport.level === 1 && invalidImport.before === invalidImport.after,
+    `level ${invalidImport.level} / 节点 ${invalidImport.before} → ${invalidImport.after}`,
+  )
+
+  // ⑲ 刷新后从 localStorage 恢复（独立浏览器上下文，避免污染主流程）
+  const persistContext = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const persistPage = await persistContext.newPage()
+  await persistPage.goto(url, { waitUntil: 'networkidle' })
+  await persistPage.waitForFunction(() => Boolean(window.__graphDebug))
+  await persistPage.waitForSelector('.graph-port')
+  const persistedBefore = await persistPage.evaluate(() => ({
+    nodes: window.__graphDebug.graph.nodes.length,
+    pos: [...window.__graphDebug.graph.nodes[0].pos],
+  }))
+  await persistPage.getByRole('button', { name: /VAE 解码/ }).click()
+  await persistPage.waitForTimeout(250)
+  await persistPage.evaluate(() => window.__graphDebug.saveNow())
+  const persistedAdded = await persistPage.evaluate(() => window.__graphDebug.graph.nodes.length)
+  await persistPage.reload({ waitUntil: 'networkidle' })
+  await persistPage.waitForFunction(() => Boolean(window.__graphDebug))
+  await persistPage.waitForSelector('.graph-port')
+  const persistedAfter = await persistPage.evaluate(() => ({
+    nodes: window.__graphDebug.graph.nodes.length,
+    pos: [...window.__graphDebug.graph.nodes[0].pos],
+  }))
+  await persistContext.close()
+  check(
+    '刷新后从 localStorage 恢复',
+    persistedAdded === persistedBefore.nodes + 1 &&
+      persistedAfter.nodes === persistedAdded &&
+      JSON.stringify(persistedAfter.pos) === JSON.stringify(persistedBefore.pos),
+    `${persistedBefore.nodes} → ${persistedAdded} → 刷新后 ${persistedAfter.nodes}`,
+  )
+
   check('无页面异常', pageErrors.length === 0, `${pageErrors.length} 个`)
 } finally {
   await browser.close()

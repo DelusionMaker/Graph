@@ -34,7 +34,7 @@ export function DevPanel({ context }: Props) {
   return (
     <aside className="dev-panel">
       <h2>开发验证</h2>
-      <p className="hint">阶段 2 · 节点系统</p>
+      <p className="hint">阶段 3 · 数据与状态</p>
 
       <section>
         <h3>几何对齐</h3>
