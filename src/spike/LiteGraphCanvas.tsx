@@ -40,25 +40,39 @@ export function LiteGraphCanvas() {
     graph.add(target)
 
     const sync = () => {
-      const nodes: NodeSnapshot[] = graph.nodes.map((n) => ({
-        id: Number(n.id),
-        type: n.type,
-        title: n.title,
-        pos: [n.pos[0], n.pos[1]],
-        size: [n.size[0], n.size[1]],
-        inputs: (n.inputs ?? []).map((p, i) => ({
-          index: i,
-          name: p.name ?? '',
-          type: String(p.type),
-          connected: p.link != null,
-        })),
-        outputs: (n.outputs ?? []).map((p, i) => ({
-          index: i,
-          name: p.name ?? '',
-          type: String(p.type),
-          connected: (p.links?.length ?? 0) > 0,
-        })),
-      }))
+      const nodes: NodeSnapshot[] = graph.nodes.map((n) => {
+        const [nx, ny] = n.pos
+        // 端口坐标直接取 LiteGraph 的权威计算结果，而不是在 React 侧重写一份公式。
+        // 差异来自边界盒、widget 输入槽等内部规则，任何公式复刻都可能差 1px 以上。
+        n.arrange()
+        return {
+          id: Number(n.id),
+          type: n.type,
+          title: n.title,
+          pos: [nx, ny],
+          size: [n.size[0], n.size[1]],
+          inputs: (n.inputs ?? []).map((p, i) => {
+            const [x, y] = n.getInputPos(i)
+            return {
+              index: i,
+              name: p.name ?? '',
+              type: String(p.type),
+              connected: p.link != null,
+              offset: [x - nx, y - ny] as [number, number],
+            }
+          }),
+          outputs: (n.outputs ?? []).map((p, i) => {
+            const [x, y] = n.getOutputPos(i)
+            return {
+              index: i,
+              name: p.name ?? '',
+              type: String(p.type),
+              connected: (p.links?.length ?? 0) > 0,
+              offset: [x - nx, y - ny] as [number, number],
+            }
+          }),
+        }
+      })
       const store = useGraphStore.getState()
       store.setNodes(nodes)
       store.setLinkCount(graph.links.size)

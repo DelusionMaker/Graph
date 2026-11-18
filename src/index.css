@@ -171,7 +171,10 @@ body {
 .spike-node {
   position: absolute;
   background: #2b2b33;
-  border: 1px solid #555;
+  /* 用 outline 而不是 border：border 会把绝对定位子元素的坐标原点推移 1px，
+     导致端口圆心与 LiteGraph 连线端点系统性偏移 1.41px */
+  border: 0;
+  outline: 1px solid #555;
   border-radius: 5px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
   pointer-events: none;

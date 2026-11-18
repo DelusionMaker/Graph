@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { GEOMETRY, inputSlotOffset, outputSlotOffset } from './geometry'
+import { GEOMETRY } from './geometry'
 import type { NodeSnapshot } from './types'
 
 interface Props {
@@ -24,7 +24,7 @@ export const NodeView = memo(function NodeView({ node }: Props) {
       </div>
 
       {node.inputs.map((port) => {
-        const [cx, cy] = inputSlotOffset(port.index)
+        const [cx, cy] = port.offset
         return (
           <div key={`in-${port.index}`}>
             <span
@@ -43,7 +43,7 @@ export const NodeView = memo(function NodeView({ node }: Props) {
       })}
 
       {node.outputs.map((port) => {
-        const [cx, cy] = outputSlotOffset(port.index, node.size[0])
+        const [cx, cy] = port.offset
         return (
           <div key={`out-${port.index}`}>
             <span

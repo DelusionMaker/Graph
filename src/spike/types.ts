@@ -9,6 +9,8 @@ export interface PortSnapshot {
   name: string
   type: string
   connected: boolean
+  /** 端口圆心相对节点左上角的偏移，直接取自 LiteGraph 的 getInputPos / getOutputPos */
+  offset: [number, number]
 }
 
 export interface NodeSnapshot {

@@ -264,7 +264,11 @@ return (
     className="node-overlay"
     style={{
       transformOrigin: '0 0',
-      transform: `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.zoom})`,
+      // 必须是 scale() 在前、translate() 在后：CSS 函数从右往左作用，
+      // 等价于 LiteGraph `ds.toCanvasContext()` 的 translate(offset) → scale()，
+      // 即屏幕坐标 = (图坐标 + offset) * zoom。
+      // 写成 translate(...) scale(...) 时 offset 不参与缩放，0.2x/3x 下节点会与连线整体错位。
+      transform: `scale(${viewport.zoom}) translate(${viewport.x}px, ${viewport.y}px)`,
       // 容器不吃事件，空白区域穿透到 canvas；仅 widget / 标题栏热区开启 auto
       pointerEvents: 'none',
     }}

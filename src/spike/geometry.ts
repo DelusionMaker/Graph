@@ -1,8 +1,11 @@
 import { LiteGraph } from '@comfyorg/litegraph'
 
 /**
- * 共享几何常量：React DOM 直接读取 LiteGraph 的运行时常量，
- * 这是"几何常量单一来源"原则的落地，而不是另写一份硬编码。
+ * 共享几何常量的唯一来源：全部从 LiteGraph 运行时读取。
+ *
+ * 端口圆心坐标不再由 React 侧推导，而是同步时直接取
+ * `node.getInputPos(i)` / `node.getOutputPos(i)` 减去 `node.pos`，
+ * 即 LiteGraph 自己用于绘制的坐标，避免"公式对齐、实际差 1px"的隐性错位。
  */
 export const SLOT_START_Y = LiteGraph.NODE_TITLE_HEIGHT
 
@@ -10,27 +13,6 @@ export const GEOMETRY = {
   titleHeight: LiteGraph.NODE_TITLE_HEIGHT,
   slotHeight: LiteGraph.NODE_SLOT_HEIGHT,
   nodeWidth: 220,
+  /** 端口圆点半径（纯 React 视觉尺寸，LiteGraph 自身命中区为 NODE_SLOT_HEIGHT） */
   slotRadius: 6,
 } as const
-
-/**
- * 输入端口圆心相对节点左上角的偏移。
- * 公式与 LiteGraph LGraphNode.getInputSlotPos 保持一致。
- */
-export function inputSlotOffset(index: number): [number, number] {
-  return [
-    LiteGraph.NODE_SLOT_HEIGHT * 0.5,
-    (index + 0.7) * LiteGraph.NODE_SLOT_HEIGHT + SLOT_START_Y,
-  ]
-}
-
-/**
- * 输出端口圆心相对节点左上角的偏移。
- * 公式与 LiteGraph LGraphNode.getOutputPos 保持一致。
- */
-export function outputSlotOffset(index: number, nodeWidth: number): [number, number] {
-  return [
-    nodeWidth + 1 - LiteGraph.NODE_SLOT_HEIGHT * 0.5,
-    (index + 0.7) * LiteGraph.NODE_SLOT_HEIGHT + SLOT_START_Y,
-  ]
-}
