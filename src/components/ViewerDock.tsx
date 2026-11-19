@@ -46,8 +46,16 @@ export function ViewerDock({ children }: { children: ReactNode }) {
   const perfMode = useViewerStore((state) => state.perfMode)
   const setPerfMode = useViewerStore((state) => state.setPerfMode)
   const dockOpen = useViewerStore((state) => state.dockOpen)
+  const wireframeFallback = useViewerStore((state) => state.wireframe)
+  const setWireframe = useViewerStore((state) => state.setWireframe)
   const nodes = useGraphStore((state) => state.nodes)
   const setWidgetValue = useGraphActions((state) => state.setWidgetValue)
+
+  const meshNode = nodes.find((node) => node.type === 'scene/Mesh')
+  const wireframeIndex = meshNode?.widgets.findIndex((widget) => widget.name === 'wireframe') ?? -1
+  const wireframe = meshNode
+    ? wireframeIndex >= 0 && meshNode.widgets[wireframeIndex].value === true
+    : wireframeFallback
   const dockRef = useRef<HTMLElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const textureRef = useRef<HTMLInputElement>(null)
@@ -69,6 +77,13 @@ export function ViewerDock({ children }: { children: ReactNode }) {
     document.body.classList.add('is-resizing-dock')
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', stop)
+  }
+
+  const handleWireframe = () => {
+    const next = !wireframe
+    setWireframe(next)
+    if (!meshNode || wireframeIndex < 0) return
+    setWidgetValue(meshNode.id, wireframeIndex, next)
   }
 
   const handleShape = (value: (typeof PRIMITIVES)[number]) => {
@@ -162,6 +177,14 @@ export function ViewerDock({ children }: { children: ReactNode }) {
               onClick={() => fileRef.current?.click()}
             >
               glTF
+            </button>
+            <button
+              type="button"
+              className={wireframe ? 'is-active' : ''}
+              title="线框模式"
+              onClick={handleWireframe}
+            >
+              线框
             </button>
             <button
               type="button"

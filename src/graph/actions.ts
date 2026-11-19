@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ImportIssue, PromptAPI, WorkflowUI } from './workflow'
+import type { ImportIssue, WorkflowUI } from './workflow'
 
 export interface ImportResult {
   ok: boolean
@@ -24,7 +24,6 @@ export interface GraphActions {
   canUndo: boolean
   canRedo: boolean
   exportWorkflow: () => WorkflowUI | null
-  exportPrompt: () => PromptAPI | null
   importWorkflow: (raw: unknown) => ImportResult
 }
 
@@ -42,7 +41,6 @@ export const defaultGraphActions: GraphActions = {
   canUndo: false,
   canRedo: false,
   exportWorkflow: () => null,
-  exportPrompt: () => null,
   importWorkflow: failedImport,
 }
 

@@ -88,7 +88,7 @@ describe('computeSignature', () => {
 
   it('与终端无关的节点变化不影响签名', () => {
     const changed = baseGraph()
-    changed.nodes.push(makeNode(9, 'sampling/KSampler', [1, 20, 8, 'euler', 'normal', 1]))
+    changed.nodes.push(makeNode(9, 'shader/Math', ['mul']))
     expect(computeSignature(changed)).toBe(computeSignature(baseGraph()))
   })
 

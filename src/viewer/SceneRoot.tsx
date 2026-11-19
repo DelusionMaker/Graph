@@ -139,6 +139,7 @@ export function SceneRoot() {
   const toolShape = useViewerStore((state) => state.shape)
   const toolUrl = useViewerStore((state) => state.gltfUrl)
   const toolScale = useViewerStore((state) => state.modelScale)
+  const toolWireframe = useViewerStore((state) => state.wireframe)
 
   const programRef = useRef(program)
   programRef.current = program
@@ -164,6 +165,13 @@ export function SceneRoot() {
     uniforms.u_shadowSoftness.value = shadow?.softness ?? 1
     requestFrame()
   }, [program, groundMaterial, requestFrame])
+
+  // 有 Mesh 节点时以节点为准；无节点时才用工具条兜底
+  const wireframe = program?.meshFromNode ? program.mesh.wireframe : toolWireframe
+  useEffect(() => {
+    material.wireframe = wireframe
+    requestFrame()
+  }, [material, wireframe, requestFrame])
 
   useEffect(
     () => () => {

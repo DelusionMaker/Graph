@@ -11,7 +11,7 @@ import {
 import { writePersistedWorkflow } from './persistence'
 import { graphToWorkflow } from './serialize'
 import { useProgramStore } from '../shader/useProgramStore'
-import { toPromptAPI, type ImportIssue, type PromptAPI, type WorkflowUI } from './workflow'
+import { type ImportIssue, type WorkflowUI } from './workflow'
 
 /**
  * 开发期调试接口：只用于手动排查与 E2E 脚本。
@@ -26,7 +26,6 @@ export interface GraphDebugApi {
   measureNodeBoxes: () => BoxMeasurement[]
   measureNativeDrawing: () => NativeMeasurement | null
   exportWorkflow: () => WorkflowUI
-  exportPrompt: () => PromptAPI
   importWorkflow: (raw: unknown) => { ok: boolean; issues: ImportIssue[] }
   undo: () => void
   redo: () => void
@@ -71,7 +70,6 @@ export function attachDebugApi(graph: LGraph, canvas: LGraphCanvas): () => void 
     measureNativeDrawing: () => measureNativeDrawing(graph, canvas),
     // 走 actions 的导出，确保带上 shader_extension.viewer 等扩展配置
     exportWorkflow: () => useGraphActions.getState().exportWorkflow() ?? graphToWorkflow(graph),
-    exportPrompt: () => toPromptAPI(graphToWorkflow(graph)),
     importWorkflow: (raw) => useGraphActions.getState().importWorkflow(raw),
     undo: () => useGraphActions.getState().undo(),
     redo: () => useGraphActions.getState().redo(),

@@ -40,91 +40,6 @@ export interface NodeDefinition {
 }
 
 export const NODE_DEFINITIONS: NodeDefinition[] = [
-  {
-    type: 'loaders/CheckpointLoader',
-    title: 'Checkpoint 加载器',
-    category: '加载器',
-    description: '加载模型、CLIP 与 VAE',
-    inputs: [],
-    outputs: [
-      { name: 'MODEL', type: 'MODEL' },
-      { name: 'CLIP', type: 'CLIP' },
-      { name: 'VAE', type: 'VAE' },
-    ],
-    widgets: [
-      {
-        name: 'ckpt_name',
-        kind: 'combo',
-        value: 'sd15.safetensors',
-        values: ['sd15.safetensors', 'sdxl_base.safetensors', 'flux_dev.safetensors'],
-      },
-    ],
-  },
-  {
-    type: 'conditioning/CLIPTextEncode',
-    title: 'CLIP 文本编码',
-    category: '条件',
-    description: '把提示词编码为条件',
-    inputs: [{ name: 'CLIP', type: 'CLIP' }],
-    outputs: [{ name: 'CONDITIONING', type: 'CONDITIONING' }],
-    widgets: [{ name: 'text', kind: 'text', value: 'a beautiful landscape' }],
-  },
-  {
-    type: 'sampling/KSampler',
-    title: 'KSampler',
-    category: '采样',
-    description: '按采样器参数去噪',
-    inputs: [
-      { name: 'MODEL', type: 'MODEL' },
-      { name: 'CONDITIONING', type: 'CONDITIONING' },
-      { name: 'LATENT', type: 'LATENT' },
-    ],
-    outputs: [{ name: 'LATENT', type: 'LATENT' }],
-    widgets: [
-      { name: 'seed', kind: 'number', value: 156680208700286, min: 0, step: 1 },
-      { name: 'steps', kind: 'number', value: 20, min: 1, max: 150, step: 1 },
-      { name: 'cfg', kind: 'number', value: 8, min: 0, max: 30, step: 0.5 },
-      {
-        name: 'sampler',
-        kind: 'combo',
-        value: 'euler',
-        values: ['euler', 'euler_ancestral', 'dpmpp_2m', 'ddim'],
-      },
-      {
-        name: 'scheduler',
-        kind: 'combo',
-        value: 'normal',
-        values: ['normal', 'karras', 'exponential'],
-      },
-      { name: 'denoise', kind: 'slider', value: 1, min: 0, max: 1, step: 0.01 },
-    ],
-  },
-  {
-    type: 'latent/EmptyLatentImage',
-    title: '空潜空间图像',
-    category: '潜空间',
-    description: '生成指定尺寸的空白 latent',
-    inputs: [],
-    outputs: [{ name: 'LATENT', type: 'LATENT' }],
-    widgets: [
-      { name: 'width', kind: 'number', value: 512, min: 64, max: 2048, step: 8 },
-      { name: 'height', kind: 'number', value: 512, min: 64, max: 2048, step: 8 },
-      { name: 'batch_size', kind: 'number', value: 1, min: 1, max: 16, step: 1 },
-    ],
-  },
-  {
-    type: 'image/VAEDecode',
-    title: 'VAE 解码',
-    category: '图像',
-    description: '把 latent 解码为图像',
-    inputs: [
-      { name: 'LATENT', type: 'LATENT' },
-      { name: 'VAE', type: 'VAE' },
-    ],
-    outputs: [{ name: 'IMAGE', type: 'IMAGE' }],
-    widgets: [],
-  },
-
   // ---------- 场景与材质域 ----------
   {
     type: 'scene/Mesh',
@@ -137,6 +52,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       { name: 'shape', kind: 'combo', value: 'box', values: ['box', 'sphere', 'torusknot', 'gltf'] },
       { name: 'assetId', kind: 'text', value: '' },
       { name: 'scale', kind: 'number', value: 1, min: 0.1, max: 10, step: 0.1 },
+      { name: 'wireframe', kind: 'boolean', value: false }
     ],
     codeAffectingWidgets: ['shape', 'assetId'],
     width: 220,

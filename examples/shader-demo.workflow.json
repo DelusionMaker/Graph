@@ -11,8 +11,8 @@
       "mode": 0,
       "inputs": [],
       "outputs": [{ "name": "geometry", "type": "GEOMETRY", "links": [1] }],
-      "widgets_values": ["sphere", "", 1],
-      "widget_names": ["shape", "assetId", "scale"]
+      "widgets_values": ["sphere", "", 1, false],
+      "widget_names": ["shape", "assetId", "scale", "wireframe"]
     },
     {
       "id": 2,

@@ -7,14 +7,14 @@ import { canvasPointToGraph, centerOffset, readViewport } from './coords'
 import { SnapshotHistory } from './history'
 import { getNodeDefinition, registerNodeDefinitions } from './nodeRegistry'
 import { readPersistedWorkflow, writePersistedWorkflow } from './persistence'
-import { seedDemoGraph } from './seed'
+import { SHADER_DEMO_WORKFLOW } from './samples'
 import { applyWorkflow, graphToWorkflow } from './serialize'
 import { cancelProgramCompile, invalidateProgram } from '../shader/invalidateProgram'
 import { useGraphStore } from './store'
 import { useToastStore } from './toastStore'
 import { installTypeSystem } from './typeSystem'
 import { useUiStore } from './uiStore'
-import { parseWorkflow, toPromptAPI, type ImportIssue, type WorkflowUI } from './workflow'
+import { parseWorkflow, type ImportIssue, type WorkflowUI } from './workflow'
 import { useViewerStore } from '../viewer/useViewerStore'
 import type {
   LinkSnapshot,
@@ -275,7 +275,6 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
     }
 
     const exportWorkflow = () => graphToWorkflow(graph, viewerConfig())
-    const exportPrompt = () => toPromptAPI(graphToWorkflow(graph))
     const importWorkflow = (raw: unknown): { ok: boolean; issues: ImportIssue[] } => {
       const { workflow, issues } = parseWorkflow(raw)
       if (!workflow) return { ok: false, issues }
@@ -593,7 +592,6 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
       undo,
       redo,
       exportWorkflow,
-      exportPrompt,
       importWorkflow,
       canUndo: false,
       canRedo: false,
@@ -610,12 +608,8 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
       }
     }
     if (!restored) {
-      suspendHistory = true
-      try {
-        seedDemoGraph(graph)
-      } finally {
-        suspendHistory = false
-      }
+      // 启动种子不预置连线：既保证视口可渲染，也保留"从零连线"的交互基线
+      rebuild({ ...SHADER_DEMO_WORKFLOW, links: [] })
     }
 
     syncSnapshot()

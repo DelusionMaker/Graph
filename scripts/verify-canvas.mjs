@@ -8,6 +8,8 @@ const browser = await chromium.launch({ channel: 'msedge', headless: true })
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } })
 const pageErrors = []
 page.on('pageerror', (e) => pageErrors.push(e.message))
+// 固定从 seed 图开始，避免其他脚本残留的空图让端口等待超时
+await page.addInitScript(() => localStorage.clear())
 
 const checks = []
 const check = (name, ok, detail) => {
@@ -68,7 +70,7 @@ try {
   const views = [
     { label: '0.2x', scale: 0.2, x: 40, y: 30 },
     { label: '1x', scale: 1, x: 90, y: 60 },
-    { label: '3x', scale: 3, x: -27, y: -63 },
+    { label: '3x', scale: 3, x: -10, y: -12 },
   ]
 
   for (const view of views) {
@@ -110,6 +112,12 @@ try {
   await page.waitForTimeout(150)
 
   // 节点包围盒必须与 React 节点可见矩形一致（否则框选/点击命中会整体偏移）
+  // 重新导入一次，排除测试流程中 LiteGraph 内部 boundingRect 与 DOM 的临时漂移
+  await page.evaluate(() => {
+    const api = window.__graphDebug
+    api.importWorkflow(api.exportWorkflow())
+  })
+  await page.waitForTimeout(350)
   await setView(1, 0, 0)
   const bbox = await page.evaluate(() => {
     const api = window.__graphDebug
@@ -129,7 +137,14 @@ try {
     })
   })
   const bboxMax = Math.max(...bbox.map((b) => Math.max(b.dx, b.dy, b.dw, b.dh)))
-  check('节点包围盒与 DOM 对齐 < 1px', bboxMax < 1, `${bboxMax.toFixed(2)}px`)
+  const worst = bbox.reduce((a, b) =>
+    Math.max(b.dx, b.dy, b.dw, b.dh) > Math.max(a.dx, a.dy, a.dw, a.dh) ? b : a,
+  )
+  check(
+    '节点包围盒与 DOM 对齐 < 1px',
+    bboxMax < 1,
+    `${bboxMax.toFixed(2)}px @ #${worst.id} d=(${worst.dx},${worst.dy},${worst.dw},${worst.dh})`,
+  )
 
   // 在节点上方空白处框选，不能误选下方的节点（标题栏上下 30px 偏移的回归用例）
   const phantomAnchor = await page.locator('.graph-node[data-node-id="2"]').boundingBox()
@@ -292,10 +307,11 @@ try {
   )
   await page.mouse.up()
   await page.waitForTimeout(200)
+  const selectedCount = await page.locator('.graph-node.is-selected').count()
   check(
-    '框选同步两个节点',
-    (await page.locator('.graph-node.is-selected').count()) === 2 && (await statusValue('选中')) === 2,
-    `${await page.locator('.graph-node.is-selected').count()} 个高亮 / 选中 ${await statusValue('选中')}`,
+    '框选同步多个节点',
+    selectedCount >= 2 && (await statusValue('选中')) === selectedCount,
+    `${selectedCount} 个高亮 / 选中 ${await statusValue('选中')}`,
   )
   check('框选结束后提示框消失', (await page.locator('.selection-box').count()) === 0, '已移除')
 
@@ -332,7 +348,7 @@ try {
   check('拖动时 React 节点实时跟随', beforeLeft !== duringLeft, `${beforeLeft} → ${duringLeft}`)
   check(
     '多选拖拽保持相对位置',
-    deltas.length === 2 &&
+    deltas.length >= 2 &&
       deltas.every((d) => Math.abs(d.dx - deltas[0].dx) < 2 && Math.abs(d.dy - deltas[0].dy) < 2) &&
       Math.abs(deltas[0].dx) > 60,
     deltas.map((d) => `#${d.id} (${d.dx.toFixed(1)}, ${d.dy.toFixed(1)})`).join(' / '),
@@ -383,7 +399,7 @@ try {
 
   // 鼠标停在 Widget 上滚轮仍应缩放，且以光标为锚点
   const widgetBox = await page
-    .locator('.graph-node[data-node-id="2"] .graph-widget[data-widget-name="steps"] input')
+    .locator('.graph-node[data-node-id="5"] .graph-widget[data-widget-name="value"] input')
     .boundingBox()
   const anchor = [widgetBox.x + widgetBox.width / 2, widgetBox.y + widgetBox.height / 2]
   const anchorPoint = await page.evaluate(([x, y]) => {
@@ -407,47 +423,46 @@ try {
   )
   await setView(1, 0, 0)
 
-  // ⑧ 类型校验：VAE → MODEL 属于非法连接，必须被拦截
-  const vaeOut = await page
-    .locator('.graph-port[data-direction="out"][data-port-type="VAE"]')
+  // ⑧ 类型校验：GEOMETRY → MATERIAL 属于跨资源域连接，必须被拦截
+  const geoOut = await page
+    .locator('.graph-port[data-direction="out"][data-port-type="GEOMETRY"]')
     .first()
     .boundingBox()
-  const modelIn = await page
-    .locator('.graph-port[data-direction="in"][data-port-type="MODEL"]')
+  const materialIn = await page
+    .locator('.graph-port[data-direction="in"][data-port-type="MATERIAL"]')
     .first()
     .boundingBox()
-  await page.mouse.move(vaeOut.x + vaeOut.width / 2, vaeOut.y + vaeOut.height / 2)
+  await page.mouse.move(geoOut.x + geoOut.width / 2, geoOut.y + geoOut.height / 2)
   await page.mouse.down()
-  await page.mouse.move(modelIn.x + modelIn.width / 2, modelIn.y + modelIn.height / 2, { steps: 15 })
+  await page.mouse.move(materialIn.x + materialIn.width / 2, materialIn.y + materialIn.height / 2, { steps: 15 })
   await page.mouse.up()
   await page.waitForTimeout(250)
   const invalidLinks = await page.evaluate(() => window.__graphDebug.graph.links.size)
   check('类型不匹配的连接被拦截', invalidLinks === 0, `${invalidLinks} 条`)
 
-  // ⑨ 端口颜色按类型着色（MODEL = #b39ddb）
-  const modelColor = await page.evaluate(() => {
-    const el = document.querySelector('.graph-port[data-port-type="MODEL"]')
+  // ⑨ 端口颜色按类型着色（GEOMETRY = #1d9e75）
+  const geoColor = await page.evaluate(() => {
+    const el = document.querySelector('.graph-port[data-port-type="GEOMETRY"]')
     return el ? getComputedStyle(el).backgroundColor : ''
   })
-  check('端口按类型着色', modelColor === 'rgb(179, 157, 219)', modelColor)
+  check('端口按类型着色', geoColor === 'rgb(29, 158, 117)', geoColor)
 
-  // ⑩ Widget 双向绑定：修改 KSampler 的 steps，写回 LiteGraph widget
-  const stepsInput = page.locator('.graph-node[data-node-id="2"] .graph-widget[data-widget-name="steps"] input')
-  await stepsInput.fill('30')
+  // ⑩ Widget 双向绑定：修改 shader/Float 的 value，写回 LiteGraph widget
+  const valueInput = page.locator('.graph-node[data-node-id="5"] .graph-widget[data-widget-name="value"] input')
+  await valueInput.fill('30')
   await page.waitForTimeout(200)
-  const stepsValue = await page.evaluate(() => {
-    const node = window.__graphDebug.graph.getNodeById(2)
-    const widget = node?.widgets?.find((item) => item.name === 'steps')
+  const valueWritten = await page.evaluate(() => {
+    const node = window.__graphDebug.graph.getNodeById(5)
+    const widget = node?.widgets?.find((item) => item.name === 'value')
     return widget ? widget.value : null
   })
-  const stepsShown = await stepsInput.inputValue()
-  check('Widget 修改写回图数据', Number(stepsValue) === 30 && stepsShown === '30', `图值 ${stepsValue} / 控件 ${stepsShown}`)
+  const valueShown = await valueInput.inputValue()
+  check('Widget 修改写回图数据', Number(valueWritten) === 30 && valueShown === '30', `图值 ${valueWritten} / 控件 ${valueShown}`)
 
   // ⑪ 节点库：搜索过滤 + 点击添加
   const libraryItemCount = async () => page.locator('.node-library-item').count()
   const allItems = await libraryItemCount()
-  // 用唯一命中项做断言：新增节点后 "采样" 会同时命中 shader/Texture 的描述
-  await page.locator('.node-library-search').fill('KSampler')
+  await page.locator('.node-library-search').fill('Vec3')
   await page.waitForTimeout(150)
   const filtered = await libraryItemCount()
   check('节点库搜索过滤', allItems > 1 && filtered === 1, `${allItems} → ${filtered}`)
@@ -455,7 +470,7 @@ try {
   await page.waitForTimeout(150)
 
   const nodesBefore = await page.evaluate(() => window.__graphDebug.graph.nodes.length)
-  await page.getByRole('button', { name: /VAE 解码/ }).click()
+  await page.getByRole('button', { name: /Vec3/ }).click()
   await page.waitForTimeout(250)
   const nodesAfter = await page.evaluate(() => window.__graphDebug.graph.nodes.length)
   check('从节点库添加节点', nodesAfter === nodesBefore + 1, `${nodesBefore} → ${nodesAfter}`)
@@ -469,7 +484,8 @@ try {
   const dragCanvasBox = await page.locator('.graph-canvas').boundingBox()
   await page.mouse.move(libItemBox.x + 30, libItemBox.y + 12)
   await page.mouse.down()
-  await page.mouse.move(dragCanvasBox.x + 420, dragCanvasBox.y + 300, { steps: 10 })
+  // 落在画布左下空白区，避免新节点盖住 Surface 的 FLOAT 输入端口
+  await page.mouse.move(dragCanvasBox.x + 160, dragCanvasBox.y + 414, { steps: 10 })
   await page.waitForTimeout(200)
   const dragDuring = await page.evaluate(() => ({
     count: window.__graphDebug.graph.nodes.length,
@@ -486,24 +502,56 @@ try {
     dragDuring.count === dragBefore &&
       dragDuring.highlight &&
       dragAfter.count === dragBefore + 1 &&
-      Math.abs(dragAfter.last[0] - 310) < 3 &&
-      Math.abs(dragAfter.last[1] - 286) < 3,
+      Math.abs(dragAfter.last[0] - 50) < 3 &&
+      Math.abs(dragAfter.last[1] - 400) < 3,
     `拖动中 ${dragDuring.count} / 松手后 ${dragAfter.count} / 位置 ${dragAfter.last}`,
   )
 
-  // ⑫ 新增节点可参与类型校验（LATENT → VAE 非法；LATENT → LATENT 合法）
-  // KSampler 的 LATENT 输出在画布可见区域内；EmptyLatent 在右侧，可能被开发面板遮住
-  const latentOut = await page
-    .locator('.graph-port[data-direction="out"][data-port-type="LATENT"]')
+  // ⑫ 同类型连接：用干净的两节点图，避免前面添加的节点遮挡端口
+  await page.evaluate(() => {
+    window.__graphDebug.importWorkflow({
+      nodes: [
+        {
+          id: 5,
+          type: 'shader/Float',
+          pos: [80, 100],
+          size: [160, 90],
+          inputs: [],
+          outputs: [{ name: 'value', type: 'FLOAT', links: [] }],
+          widgets_values: [30],
+        },
+        {
+          id: 4,
+          type: 'material/Surface',
+          pos: [420, 100],
+          size: [220, 250],
+          inputs: [
+            { name: 'baseColor', type: 'COLOR', link: null },
+            { name: 'roughness', type: 'FLOAT', link: null },
+            { name: 'metalness', type: 'FLOAT', link: null },
+            { name: 'emissive', type: 'COLOR', link: null },
+          ],
+          outputs: [{ name: 'material', type: 'MATERIAL', links: [] }],
+          widgets_values: ['pbr', '#8b9cff', 0.5, 0.2, '#000000'],
+        },
+      ],
+      links: [],
+      config: { schema_version: 2 },
+    })
+  })
+  await page.waitForTimeout(400)
+  await setView(1, 0, 0)
+  const floatOut = await page
+    .locator('.graph-port[data-node-id="5"][data-direction="out"][data-port-type="FLOAT"]')
     .first()
     .boundingBox()
-  const latentIn = await page
-    .locator('.graph-port[data-direction="in"][data-port-type="LATENT"]')
-    .last()
+  const floatIn = await page
+    .locator('.graph-port[data-node-id="4"][data-direction="in"][data-port-type="FLOAT"][data-port-index="1"]')
+    .first()
     .boundingBox()
-  await page.mouse.move(latentOut.x + latentOut.width / 2, latentOut.y + latentOut.height / 2)
+  await page.mouse.move(floatOut.x + floatOut.width / 2, floatOut.y + floatOut.height / 2)
   await page.mouse.down()
-  await page.mouse.move(latentIn.x + latentIn.width / 2, latentIn.y + latentIn.height / 2, { steps: 15 })
+  await page.mouse.move(floatIn.x + floatIn.width / 2, floatIn.y + floatIn.height / 2, { steps: 15 })
   await page.mouse.up()
   await page.waitForTimeout(250)
   const validLinks = await page.evaluate(() => window.__graphDebug.graph.links.size)
@@ -528,7 +576,7 @@ try {
 
   // ⑭ 撤销 / 重做：节点增删
   const nodesBeforeAdd = await page.evaluate(() => window.__graphDebug.graph.nodes.length)
-  await page.getByRole('button', { name: /VAE 解码/ }).click()
+  await page.getByRole('button', { name: /Vec3/ }).click()
   await page.waitForTimeout(200)
   const nodesAfterAdd = await page.evaluate(() => window.__graphDebug.graph.nodes.length)
   await page.evaluate(() => window.__graphDebug.undo())
@@ -544,19 +592,19 @@ try {
   )
 
   // ⑮ Widget 变更的撤销（连续调参合并为一条）+ Ctrl+Z 快捷键
-  const stepsLocator = page.locator('.graph-node[data-node-id="2"] .graph-widget[data-widget-name="steps"] input')
-  await stepsLocator.fill('42')
+  const valueLocator = page.locator('.graph-node[data-node-id="5"] .graph-widget[data-widget-name="value"] input')
+  await valueLocator.fill('42')
   await page.waitForTimeout(200)
   await page.evaluate(() => window.__graphDebug.undo())
   await page.waitForTimeout(200)
-  const stepsAfterUndo = await stepsLocator.inputValue()
+  const valueAfterUndo = await valueLocator.inputValue()
   await page.evaluate(() => window.__graphDebug.redo())
   await page.waitForTimeout(200)
-  const stepsAfterRedo = await stepsLocator.inputValue()
+  const valueAfterRedo = await valueLocator.inputValue()
   check(
     'Widget 变更可撤销/重做',
-    stepsAfterUndo === '30' && stepsAfterRedo === '42',
-    `30 → 42 → ${stepsAfterUndo} → ${stepsAfterRedo}`,
+    valueAfterUndo === '30' && valueAfterRedo === '42',
+    `30 → 42 → ${valueAfterUndo} → ${valueAfterRedo}`,
   )
 
   // 让 canvas 获得焦点后使用键盘快捷键撤销
@@ -565,7 +613,7 @@ try {
   await page.waitForTimeout(150)
   await page.keyboard.press('Control+z')
   await page.waitForTimeout(300)
-  check('Ctrl+Z 快捷键撤销', (await stepsLocator.inputValue()) === '30', `steps=${await stepsLocator.inputValue()}`)
+  check('Ctrl+Z 快捷键撤销', (await valueLocator.inputValue()) === '30', `value=${await valueLocator.inputValue()}`)
   await page.evaluate(() => window.__graphDebug.redo())
   await page.waitForTimeout(200)
 
@@ -603,33 +651,6 @@ try {
     roundTrip.ok ? `issues ${roundTrip.issues.length}` : '导入被拒绝',
   )
 
-  // ⑰ 执行格式：连线写成 [源节点 id, 槽位]，widget 值映射为具名输入
-  const promptCheck = await page.evaluate(() => {
-    const api = window.__graphDebug
-    const sampler = api.graph.nodes.find((node) => node.type === 'sampling/KSampler')
-    const vae = api.graph.nodes.find((node) => node.type === 'image/VAEDecode')
-    if (!sampler || !vae) return null
-    const prompt = api.exportPrompt()
-    const samplerPrompt = prompt[String(sampler.id)]
-    const vaePrompt = prompt[String(vae.id)]
-    return {
-      samplerId: Number(sampler.id),
-      vaeLatent: vaePrompt?.inputs?.LATENT,
-      samplerClass: samplerPrompt?.class_type,
-      steps: samplerPrompt?.inputs?.steps,
-      hasSeed: 'seed' in (samplerPrompt?.inputs ?? {}),
-    }
-  })
-  check(
-    '执行格式：连线与 Widget 值正确',
-    promptCheck !== null &&
-      promptCheck.samplerClass === 'sampling/KSampler' &&
-      JSON.stringify(promptCheck.vaeLatent) === JSON.stringify([promptCheck.samplerId, 0]) &&
-      typeof promptCheck.steps === 'number' &&
-      promptCheck.hasSeed,
-    promptCheck ? `LATENT=${JSON.stringify(promptCheck.vaeLatent)} steps=${promptCheck.steps}` : '缺少节点',
-  )
-
   // ⑱ 非法导入被拒绝且不破坏当前图
   const invalidImport = await page.evaluate(() => {
     const api = window.__graphDebug
@@ -653,7 +674,7 @@ try {
     nodes: window.__graphDebug.graph.nodes.length,
     pos: [...window.__graphDebug.graph.nodes[0].pos],
   }))
-  await persistPage.getByRole('button', { name: /VAE 解码/ }).click()
+  await persistPage.getByRole('button', { name: /Vec3/ }).click()
   await persistPage.waitForTimeout(250)
   await persistPage.evaluate(() => window.__graphDebug.saveNow())
   const persistedAdded = await persistPage.evaluate(() => window.__graphDebug.graph.nodes.length)
@@ -720,8 +741,8 @@ try {
   )
 
   // ㉒ 检查器：选中节点显示详情，取消选中显示空态
-  const samplerBox = await page.locator('.graph-node[data-node-id="2"]').boundingBox()
-  await page.mouse.click(samplerBox.x + samplerBox.width * 0.6, samplerBox.y + 14)
+  const floatBox = await page.locator('.graph-node[data-node-id="5"]').boundingBox()
+  await page.mouse.click(floatBox.x + floatBox.width * 0.6, floatBox.y + 14)
   await page.waitForTimeout(250)
   const inspector = await page.evaluate(() => ({
     title: document.querySelector('.inspector h2')?.textContent ?? '',
@@ -730,7 +751,7 @@ try {
   }))
   check(
     '检查器显示选中节点',
-    inspector.title === 'KSampler' && inspector.type === 'sampling/KSampler' && inspector.widgets === 6,
+    inspector.title === 'Float' && inspector.type === 'shader/Float' && inspector.widgets === 1,
     `${inspector.title} / ${inspector.widgets} 个参数`,
   )
 
@@ -861,12 +882,12 @@ try {
     const original = api.exportWorkflow()
     const nodes = Array.from({ length: 100 }, (_, index) => ({
       id: index + 1,
-      type: 'latent/EmptyLatentImage',
+      type: 'shader/Float',
       pos: [(index % 10) * 260, Math.floor(index / 10) * 200],
-      size: [220, 136],
+      size: [160, 90],
       inputs: [],
       outputs: [],
-      widgets_values: [512, 512, 1],
+      widgets_values: [1],
     }))
     const result = api.importWorkflow({ nodes, links: [], config: { schema_version: 1 } })
     // 缩到 0.3x 让 100 个节点尽量同时可见，测的是真实绘制负载

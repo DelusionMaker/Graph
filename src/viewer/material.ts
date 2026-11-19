@@ -133,6 +133,7 @@ export function createProgramMaterial(program: CompiledProgram | null): ShaderMa
     fragmentShader: source.fragmentShader,
     uniforms: buildUniforms(program),
   })
+  material.wireframe = program.mesh.wireframe
   material.userData.hash = program.hash
   return material
 }
@@ -156,4 +157,5 @@ export function syncMaterial(material: Material, program: CompiledProgram | null
   }
 
   material.uniforms = buildUniforms(program)
+  material.wireframe = program.mesh.wireframe
 }

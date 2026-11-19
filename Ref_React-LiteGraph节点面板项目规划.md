@@ -1,10 +1,10 @@
-# React + LiteGraph 节点面板复刻项目规划
+# React + LiteGraph 节点系统规划（类似 ComfyUI 风格）
 
-> **版本**：v1.2（按 LiteGraph 0.17.2 类型定义校准）  
-> **日期**：2026-11-18  
+> **版本**：v1.3（按 LiteGraph 0.17.2 类型定义校准；定位措辞修订）  
+> **日期**：2026-11-19  
 > **状态**：阶段 0–5 已实现（2026-11-18），验收结果见 README「阶段 5 验收报告」  
-> **修订要点**：v1.1 基于通用 LiteGraph 知识修订，v1.2 依据 `@comfyorg/litegraph@0.17.2` 的 `.d.ts` 与可编译 Spike 回正两处 API（`LGraphCanvas` 构造仍为 options 对象、`addWidget` 仍为位置参数）；锁定版本；明确事件归属与端口几何一致性；修正 `toPromptAPI` 覆盖缺陷与 id 类型；补充导入校验、阶段 0 量化验证清单与测试策略。
-> **定位**：在 Web 端复刻 ComfyUI 风格的可视化节点编辑器，以 React 构建 UI 层、LiteGraph.js 作为节点图引擎。
+> **修订要点**：v1.1 基于通用 LiteGraph 知识修订，v1.2 依据 `@comfyorg/litegraph@0.17.2` 的 `.d.ts` 与可编译 Spike 回正两处 API（`LGraphCanvas` 构造仍为 options 对象、`addWidget` 仍为位置参数）；锁定版本；明确事件归属与端口几何一致性；修正 `toPromptAPI` 覆盖缺陷与 id 类型；补充导入校验、阶段 0 量化验证清单与测试策略。v1.3 将项目定位由“复刻 ComfyUI”调整为“类似 ComfyUI 的节点系统”：交互与视觉借鉴其工作流风格，但不以克隆或逐项一致为目标；后续 3D/Shader 扩展也按此定位推进。
+> **定位**：在 Web 端构建一个**类似 ComfyUI 风格**的可视化节点系统，以 React 构建 UI 层、LiteGraph.js 作为节点图引擎。借鉴的是其节点化工作流与画布交互范式，不追求与官方前端或 API 的一致。
 
 ---
 
@@ -12,7 +12,7 @@
 
 ### 1.1 项目目标
 
-构建一个可运行的 Web 节点编辑器原型，具备与 ComfyUI 同级别的画布交互体验（平移、缩放、连线、框选、多节点操作），并采用 **React 负责 UI、LiteGraph 负责图与画布** 的分层架构。核心验证目标是：**证明 React 声明式 UI 与 LiteGraph 命令式画布可以稳定共存**，为后续接入真实执行后端留出清晰接口。
+构建一个可运行的 Web 节点编辑器原型，具备**类似 ComfyUI 的**画布交互体验（平移、缩放、连线、框选、多节点操作），并采用 **React 负责 UI、LiteGraph 负责图与画布** 的分层架构。核心验证目标是：**证明 React 声明式 UI 与 LiteGraph 命令式画布可以稳定共存**，为后续接入真实执行后端留出清晰接口。
 
 ### 1.2 范围内（In Scope）
 
@@ -31,7 +31,7 @@
 
 - 后端执行引擎（Python / PyTorch 推理）——本项目仅交付前端面板。
 - 真实 AI 模型推理与 GPU 计算。
-- 与 ComfyUI 官方 API 的完全兼容（v1 仅保证**数据格式相似**与**概念一致**）。
+- 与 ComfyUI 官方前端或 API 的兼容/一一对应（本项目仅借鉴**节点化工作流范式**与**画布交互风格**，数据格式相似、概念一致，但不承诺官方兼容）。
 - 多人实时协同、云端存储。
 - 移动端触控的完整支持（v1 以桌面端为主要目标，移动端保证"可查看、不崩坏"）。
 
@@ -624,5 +624,5 @@ export function toPromptAPI(ui: WorkflowUI): PromptAPI {
 ## 附录 B：参考资源
 
 - LiteGraph.js GitHub 仓库与示例
-- ComfyUI 官方文档：Nodes 2.0 架构说明（**注意**：ComfyUI 新前端已演进到 Vue + 新渲染层；本项目复刻的是 LiteGraph 时代的工作流风格与交互，不追求与新前端技术栈一致）
+- ComfyUI 官方文档：Nodes 2.0 架构说明（**注意**：ComfyUI 新前端已演进到 Vue + 新渲染层；本项目参考的是 LiteGraph 时代的工作流风格与交互，不追求与新前端技术栈一致）
 - ComfyUI 工作流元数据文档（workflow / prompt 双字段设计）

@@ -4,15 +4,6 @@ export type { PortType }
 
 /** 端口类型 → 颜色，React 端口圆点与 LiteGraph 连线共用同一份 */
 export const PORT_COLORS: Record<string, string> = {
-  MODEL: '#b39ddb',
-  CLIP: '#80deea',
-  VAE: '#ffb74d',
-  CONDITIONING: '#64b5f6',
-  CONTROL_NET: '#5c6bc0',
-  LATENT: '#f48fb1',
-  IMAGE: '#81c784',
-  MASK: '#bdbdbd',
-  SIGMAS: '#a1887f',
   INT: '#9e9e9e',
   FLOAT: '#9e9e9e',
   STRING: '#9e9e9e',

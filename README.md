@@ -16,7 +16,7 @@ npm install
 npm run dev
 ```
 
-打开 http://localhost:5173 。顶部是撤销/重做、载入示例（含「载入 3D 示例」）与导入导出；左侧上半是 3D 视口、下半是节点库；中央画布；右侧检查器（开发环境下可切到验证面板）。
+打开 http://localhost:5173 。顶部是撤销/重做、「载入 3D 示例」与工作流导入导出；左侧上半是 3D 视口、下半是节点库；中央画布；右侧检查器（开发环境下可切到验证面板）。
 
 构建检查：
 
@@ -35,10 +35,10 @@ npm test
 ```bash
 npm run verify:canvas      # 画布交互逐项回归
 npm run verify:acceptance  # 阶段 5 全流程验收（示例工作流 / 性能 / 异常路径）
-npm run verify:3d          # 3D / Shader / 后处理验收（34 项）
+npm run verify:3d          # 3D / Shader / 后处理验收（36 项）
 ```
 
-示例工作流见 `examples/`：`text-to-image.workflow.json`（ComfyUI 风格）与 `shader-demo.workflow.json`（3D/Shader）。也可以在应用内点「载入示例」或「载入 3D 示例」直接载入。
+示例工作流见 `examples/shader-demo.workflow.json`，也可以在应用内点「载入 3D 示例」直接载入。启动时若没有本地数据，会自动以同一份示例（去掉连线）作为种子图。
 
 ## 当前能力（阶段 5）
 
@@ -53,9 +53,8 @@ npm run verify:3d          # 3D / Shader / 后处理验收（34 项）
 | Widget | React 渲染 number / slider / combo / text / toggle，修改写回 LiteGraph widget |
 | 类型系统 | 端口与连线按类型着色；`INT↔FLOAT` 互连放行，非法类型与环路连接被拦截并弹出提示 |
 | 节点注册 | `NodeDefinition` 声明输入/输出/Widget，运行时注册为 LiteGraph 节点类型 |
-| 双格式数据 | UI 格式（含布局）与执行格式（纯拓扑）互转；`toPromptAPI` 为纯函数 |
-| 导入导出 | 顶部按钮导出 `workflow.json` / `prompt.json`，导入时做三级校验；导入后自动缩放以容纳全部节点 |
-| 示例工作流 | 「载入示例」一键载入 5 节点 6 连线的文生图工作流（也可导入 `examples/` 下的 JSON） |
+| 导入导出 | 顶部按钮导出 `workflow.json`（含布局与视口配置），导入时做三级校验；导入后自动缩放以容纳全部节点 |
+| 示例工作流 | 「载入 3D 示例」一键载入含材质、光照与后处理链的 3D 场景（也可导入 `examples/shader-demo.workflow.json`） |
 | 持久化 | 图变更后 1s 防抖写入 `localStorage`（键 `node-editor:workflow:v1`），刷新自动恢复 |
 | 撤销/重做 | 快照式历史栈（上限 50），连续调参合并为一条；`Ctrl/⌘+Z`、`Ctrl/⌘+Shift+Z` |
 | 导入校验 | ① 结构错误拒绝导入；② 悬空连线/重复 id 丢弃并提示；③ 未知端口类型降级为 `*` |
@@ -65,7 +64,7 @@ npm run verify:3d          # 3D / Shader / 后处理验收（34 项）
 | 检查器 | 右侧面板显示选中节点的类型、布局、端口与参数（可直接编辑） |
 | 响应式 | 1280px / 1920px 无溢出，窄屏逐级收起检查器与节点库 |
 | 无障碍 | 画布/按钮/Widget 均有可访问名称，键盘焦点可见，尊重 `prefers-reduced-motion` |
-| 3D 预览 | 左栏 R3F 视口；Box / Sphere / TorusKnot / glTF 上传；OrbitControls；相机随工作流保存（schema v2） |
+| 3D 预览 | 左栏 R3F 视口；Box / Sphere / TorusKnot / glTF 上传、线框模式；OrbitControls；相机随工作流保存（schema v2） |
 | Shader 节点 | 22 个端口类型、23 个场景/材质/光照/shader/后处理节点；自定义 PBR 与 Unlit |
 | 自定义光照 | Ambient / Directional / Point 节点 + LightRig；GGX BRDF 在片元 shader 中计算 |
 | 自定义阴影 | `render/Shadow` + 独立 depth pass + 3×3 PCF；不使用 three 的 Light / shadowMap |
@@ -73,29 +72,29 @@ npm run verify:3d          # 3D / Shader / 后处理验收（34 项）
 | 后处理 | Bloom / SSAO / Vignette / SMAA，按连线顺序执行；空链不渲染 Composer |
 | 资源与性能 | glTF / 贴图上传与释放；FPS / 帧时间 / draw calls / 三角面数 HUD（4Hz） |
 
-内置 28 种节点：5 个 ComfyUI 节点（Checkpoint / CLIP / KSampler / 空潜空间 / VAE 解码）与 23 个场景、材质、光照、shader、后处理节点。
+内置 23 种节点：场景、材质、光照、shader 与后处理节点。端口类型 13 项（通用标量、shader 值、资源、光照）。
 
 右侧「开发验证」面板可手动测量几何偏差与原生绘制隐藏情况；`window.__graphDebug` 提供同一套测量接口与导入导出/撤销重做入口供自动化脚本调用（仅开发构建挂载）。
 
 ## 验证口径
 
-`npm run verify:canvas` 共 63 项检查：
+`npm run verify:canvas` 共 62 项检查：
 
 - **几何**：0.2x / 1x / 3x 三档缩放且各带不同平移量，端口圆心与节点框偏差均 < 2px；节点包围盒与 DOM 对齐 < 1px；
 - **原生绘制**：对比"节点在画布内 / 临时移出画布"两帧的 canvas 像素差异（0%），并用反证用例确认恢复 `drawNode` 后差异为 100%；
 - **交互**：端口拖拽连线、状态栏同步、端口连接态、中键平移、滚轮缩放后连线端点贴合端口（读 canvas 像素，实测 < 2px）、点击选中连线、Delete 删除、点击选中节点、框选提示框跟随指针（< 2px）、框选同步、多选拖拽、拖动实时跟随、缩放节点时 DOM/端口实时跟随、Widget 上滚轮以光标为锚点缩放（锚点漂移 < 2px）；
 - **回归**：节点上方空白处框选不误选；
-- **类型系统**：VAE→MODEL 非法连接被拦截、端口按类型着色；
+- **类型系统**：GEOMETRY→MATERIAL 跨资源域连接被拦截、端口按类型着色；
 - **节点系统**：Widget 修改写回图数据、节点库搜索过滤、从节点库添加节点、拖拽只在画布落点创建一个节点、新增节点可正常连线；
-- **数据层**：撤销/重做（连线、节点增删、Widget 变更、Ctrl+Z 快捷键）、导出再导入结构一致、执行格式的连线与 Widget 映射、非法导入被拒绝、刷新后从 localStorage 恢复；
+- **数据层**：撤销/重做（连线、节点增删、Widget 变更、Ctrl+Z 快捷键）、导出再导入结构一致、非法导入被拒绝、刷新后从 localStorage 恢复；
 - **视觉与布局**：主题切换保持图状态并持久化、低缩放 LOD、检查器显示/空态、迷你地图节点数与点击导航（目标点居中、投影不随视口漂移、重复点击不位移）、1280/1920px 无溢出；
 - **性能**：100 节点在 0.3x 下 `canvas.draw` < 20ms/帧（实测约 0.3ms）；
 - **无障碍**：画布、工具按钮、Widget 控件均有可访问名称；
 - **稳定性**：无页面异常。
 
-单元测试 `npm test`（Vitest）覆盖 6 个文件 / 56 项：`toPromptAPI` 的连线/静音/Widget 覆盖规则、`parseWorkflow` 的三级校验与索引重建（含 v1 → v2 迁移）、`SnapshotHistory` 的去重/上限/分支截断/合并窗口、编译器的签名/注入/Unlit/错误、后处理链顺序、连接类型矩阵。
+单元测试 `npm test`（Vitest）覆盖 6 个文件 / 57 项：`toPromptAPI` 的连线/静音/Widget 覆盖规则、`parseWorkflow` 的三级校验与索引重建（含 v1 → v2 迁移）、`SnapshotHistory` 的去重/上限/分支截断/合并窗口、编译器的签名/注入/Unlit/错误、后处理链顺序、连接类型矩阵。
 
-`npm run verify:3d` 共 34 项：
+`npm run verify:3d` 共 36 项：
 
 - 几何体切换与工具条 → 节点同步；
 - OrbitControls 相机写回与持久化；
@@ -110,25 +109,25 @@ npm run verify:3d          # 3D / Shader / 后处理验收（34 项）
 
 ## 阶段 5 验收报告
 
-`npm run verify:acceptance` 覆盖规划 §11.1 的全流程检查，**19/19 通过**。3D / Shader 扩展验收见 `npm run verify:3d`（26/26）。
+`npm run verify:acceptance` 覆盖 3D 工作流全流程检查，**19/19 通过**。3D / Shader 扩展验收见 `npm run verify:3d`（36/36）。
 
 | 验收项 | 结果 |
 |---|---|
-| 示例工作流载入（5 节点 / 6 连线） | 通过，执行格式引用正确（`[源节点, 槽位]`） |
-| 删除节点 → 撤销恢复 | 5 → 4 → 5 |
+| 3D 示例载入（11 节点 / 8 连线） | 通过，编译产物就绪（PBR / 2 盏灯 / Bloom） |
+| 删除节点 → 撤销恢复 | 11 → 10 → 11 |
 | 导出 → 导入结构一致 | 通过（节点/位置/尺寸/Widget/连线全部一致） |
-| 非法类型连接拦截 + 提示 | 6 条连线不变，Toast 显示「VAE → MODEL 类型不匹配」 |
-| 环路连接拦截 + 提示 | 7 条连线不变，Toast 显示「不能连接：会形成循环依赖」 |
+| 非法类型连接拦截 + 提示 | 8 条连线不变，Toast 显示「GEOMETRY → MATERIAL 类型不匹配」 |
+| 环路连接拦截 + 提示 | 1 条连线不变，Toast 显示「不能连接：会形成循环依赖」 |
 | 100 节点渲染性能（0.3x） | 平均 **0.3ms/帧**、峰值 **0.5ms**（阈值 20ms，≥50fps） |
 | 100 节点 LOD | DOM 100 个节点，Widget/LOD 生效 |
-| 撤销/重做 100 节点导入 | 6 → 100 |
+| 撤销/重做 100 节点导入 | 2 → 100 |
 | localStorage 写入失败 | 捕获异常，编辑不中断 |
-| 保存后刷新恢复 | 4 → 5 → 5 |
+| 保存后刷新恢复 | 11 → 12 → 12 |
 | 1280 / 1920 布局 | 无横向溢出，画布 820 / 1380px |
 | 仓库示例 JSON 可导入 | 5 节点 / 6 连线 |
 | 页面异常 | 0 |
 
-性能说明：上表统计的是 LiteGraph 画布帧成本（节点/连线/背景），React 覆盖层在 0.3x 下由 LOD 隐藏文字与控件；100 节点全量 DOM 仍保持 100 个节点框，滚动与拖拽未出现掉帧。示例工作流见 `examples/text-to-image.workflow.json`。
+性能说明：上表统计的是 LiteGraph 画布帧成本（节点/连线/背景），React 覆盖层在 0.3x 下由 LOD 隐藏文字与控件；100 节点全量 DOM 仍保持 100 个节点框，滚动与拖拽未出现掉帧。示例工作流见 `examples/shader-demo.workflow.json`。
 
 ### 已知边界
 
@@ -213,7 +212,7 @@ src/
 │   ├── history.ts              # 快照历史栈（上限/合并窗口）
 │   ├── persistence.ts          # localStorage 读写
 │   ├── uiStore.ts              # 主题状态与持久化
-│   ├── samples.ts              # 示例工作流（ComfyUI + 3D/Shader）
+│   ├── samples.ts              # 3D / Shader 示例工作流
 │   ├── toastStore.ts           # 轻量提示状态
 │   ├── connectionFeedback.ts   # 连接被拒原因记录（类型/环路）
 │   ├── seed.ts                 # 初始示例图
@@ -252,12 +251,11 @@ src/
 ├── perf/                       # 性能采样
 │   └── PerfProbe.tsx / usePerfStore.ts / PerfHUD.tsx
 examples/
-├── text-to-image.workflow.json # ComfyUI 示例
 └── shader-demo.workflow.json   # 3D / Shader 示例
 scripts/
-├── verify-canvas.mjs           # 画布交互逐项回归（63 项）
-├── verify-acceptance.mjs       # 阶段 5 全流程验收（19 项）
-└── verify-3d.mjs               # 3D / Shader 验收（33 项）
+├── verify-canvas.mjs           # 画布交互逐项回归（62 项）
+├── verify-acceptance.mjs       # 3D 工作流验收（19 项）
+└── verify-3d.mjs               # 3D / Shader 验收（36 项）
 ```
 
 ## 后续阶段

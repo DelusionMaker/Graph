@@ -1,23 +1,12 @@
 /**
- * 工作流双格式模型（纯函数，无 LiteGraph / DOM 依赖，便于单元测试）。
- *
- * - UI 格式：带布局坐标，用于保存与恢复画布
- * - 执行格式：纯拓扑，用于提交后端
+ * 工作流 UI 格式模型（纯函数，无 LiteGraph / DOM 依赖，便于单元测试）。
+ * 带布局坐标，用于保存、恢复与校验画布数据。
  */
 
 export const SCHEMA_VERSION = 2
 
 export const PORT_TYPES = [
-  // 既有 ComfyUI 类型，全部保留
-  'MODEL',
-  'CLIP',
-  'VAE',
-  'CONDITIONING',
-  'LATENT',
-  'IMAGE',
-  'MASK',
-  'CONTROL_NET',
-  'SIGMAS',
+  // 通用标量类型
   'INT',
   'FLOAT',
   'STRING',
@@ -99,14 +88,6 @@ export interface WorkflowUI {
   config: WorkflowConfig
 }
 
-export interface PromptNode {
-  class_type: string
-  inputs: Record<string, unknown>
-  _meta?: { title?: string }
-}
-
-export type PromptAPI = Record<string, PromptNode>
-
 /** 导入问题级别：1 = 结构性错误（拒绝导入）；2 = 引用问题（丢弃相关数据）；3 = 类型问题（降级为 *） */
 export interface ImportIssue {
   level: 1 | 2 | 3
@@ -127,45 +108,6 @@ export function createEmptyWorkflow(): WorkflowUI {
     groups: [],
     config: { schema_version: SCHEMA_VERSION },
   }
-}
-
-/**
- * UI 格式 → 执行格式。
- * - 静音 / 旁路节点不进入执行图
- * - 已连线的输入写 `[源节点 id, 源槽位]`，不再被 widget 值覆盖
- * - widget 值按 widget_names 映射到 inputs 键名
- */
-export function toPromptAPI(workflow: WorkflowUI): PromptAPI {
-  const linkById = new Map(workflow.links.map((link) => [link[0], link]))
-  const result: PromptAPI = {}
-
-  for (const node of workflow.nodes) {
-    if (node.mode === 1 || node.mode === 2) continue
-
-    const inputs: Record<string, unknown> = {}
-    const connected = new Set<string>()
-
-    for (const port of node.inputs) {
-      if (port.link == null) continue
-      const link = linkById.get(port.link)
-      if (!link) continue
-      inputs[port.name] = [link[1], link[2]]
-      connected.add(port.name)
-    }
-
-    node.widgets_values.forEach((value, index) => {
-      const name = node.widget_names?.[index] ?? node.inputs[index]?.name ?? `widget_${index}`
-      if (!connected.has(name)) inputs[name] = value
-    })
-
-    result[String(node.id)] = {
-      class_type: node.type,
-      inputs,
-      ...(node.title ? { _meta: { title: node.title } } : {}),
-    }
-  }
-
-  return result
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

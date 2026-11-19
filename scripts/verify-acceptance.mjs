@@ -40,21 +40,25 @@ const dragPort = async (fromSelector, toSelector) => {
 const graphState = () =>
   page.evaluate(() => ({ nodes: window.__graphDebug.graph.nodes.length, links: window.__graphDebug.graph.links.size }))
 
-// ① 示例工作流：一键载入后 5 节点 6 连线，执行格式引用正确
-await page.getByRole('button', { name: '载入示例' }).click()
-await page.waitForTimeout(500)
+// ① 3D 示例：载入后 11 节点 8 连线，编译产物就绪
+await page.getByRole('button', { name: '载入 3D 示例' }).click()
+await page.waitForTimeout(700)
 const sample = await page.evaluate(() => {
   const api = window.__graphDebug
-  return { nodes: api.graph.nodes.length, links: api.graph.links.size, prompt: api.exportPrompt() }
+  const state = api.programState()
+  return {
+    nodes: api.graph.nodes.length,
+    links: api.graph.links.size,
+    shading: state.shading,
+    lights: state.lighting?.lights?.length,
+    postfx: state.postfx,
+  }
 })
-check('示例工作流 5 节点 / 6 连线', sample.nodes === 5 && sample.links === 6, `${sample.nodes} / ${sample.links}`)
+check('3D 示例 11 节点 / 8 连线', sample.nodes === 11 && sample.links === 8, `${sample.nodes} / ${sample.links}`)
 check(
-  '示例执行格式引用正确',
-  Object.keys(sample.prompt).length === 5 &&
-    JSON.stringify(sample.prompt['3']?.inputs?.LATENT) === JSON.stringify([4, 0]) &&
-    JSON.stringify(sample.prompt['5']?.inputs?.LATENT) === JSON.stringify([3, 0]) &&
-    JSON.stringify(sample.prompt['2']?.inputs?.CLIP) === JSON.stringify([1, 1]),
-  `KSampler.LATENT=${JSON.stringify(sample.prompt['3']?.inputs?.LATENT)}`,
+  '3D 示例编译产物就绪',
+  sample.shading === 'pbr' && sample.lights === 2 && sample.postfx.length === 1,
+  `shading=${sample.shading} lights=${sample.lights} postfx=${sample.postfx.join('>')}`,
 )
 
 // ② 删除节点 → 撤销恢复
@@ -70,7 +74,7 @@ await page.waitForTimeout(300)
 const afterRestore = await graphState()
 check(
   '删除节点后撤销恢复',
-  afterDelete.nodes === 4 && afterRestore.nodes === 5 && afterRestore.links === 6,
+  afterDelete.nodes === 10 && afterRestore.nodes === 11 && afterRestore.links === 8,
   `${afterDelete.nodes} → ${afterRestore.nodes}`,
 )
 
@@ -94,40 +98,54 @@ check('导出再导入结构一致', roundTrip.ok && roundTrip.same)
 await page.evaluate(() => window.__graphDebug.setView(0.6, 0, 40))
 await page.waitForTimeout(200)
 await dragPort(
-  '.graph-port[data-direction="out"][data-port-type="VAE"]',
-  '.graph-port[data-direction="in"][data-port-type="MODEL"]',
+  '.graph-port[data-direction="out"][data-port-type="GEOMETRY"]',
+  '.graph-port[data-direction="in"][data-port-type="MATERIAL"]',
 )
 const invalid = await page.evaluate(() => ({
   links: window.__graphDebug.graph.links.size,
   toasts: [...document.querySelectorAll('.toast')].map((element) => element.textContent).join(' | '),
 }))
-check('非法类型连接被拦截', invalid.links === 6, `${invalid.links} 条`)
+check('非法类型连接被拦截', invalid.links === 8, `${invalid.links} 条`)
 check('非法连接给出提示', /类型不匹配/.test(invalid.toasts), invalid.toasts)
 
-// ⑤ 环路拦截：两个 KSampler 之间反向连线
-await page.getByRole('button', { name: /^KSampler/ }).first().click()
+// ⑤ 环路拦截：用干净的两个 shader/Math，避免节点重叠遮挡端口
+await page.evaluate(() => {
+  const mathNode = (id, x) => ({
+    id,
+    type: 'shader/Math',
+    pos: [x, 100],
+    size: [170, 120],
+    inputs: [
+      { name: 'a', type: 'FLOAT', link: null },
+      { name: 'b', type: 'FLOAT', link: null },
+    ],
+    outputs: [{ name: 'result', type: 'FLOAT', links: [] }],
+    widgets_values: ['mul'],
+  })
+  window.__graphDebug.importWorkflow({
+    nodes: [mathNode(20, 100), mathNode(21, 420)],
+    links: [],
+    config: { schema_version: 2 },
+  })
+})
 await page.waitForTimeout(400)
-const ksamplers = await page.evaluate(() =>
-  window.__graphDebug.graph.nodes
-    .filter((node) => node.type === 'sampling/KSampler')
-    .map((node) => Number(node.id)),
-)
-const [firstKs, secondKs] = ksamplers
+const firstMath = 20
+const secondMath = 21
 await dragPort(
-  `.graph-port[data-node-id="${firstKs}"][data-direction="out"][data-port-index="0"]`,
-  `.graph-port[data-node-id="${secondKs}"][data-direction="in"][data-port-index="2"]`,
+  `.graph-port[data-node-id="${firstMath}"][data-direction="out"][data-port-index="0"]`,
+  `.graph-port[data-node-id="${secondMath}"][data-direction="in"][data-port-index="0"]`,
 )
 const forwardLinks = (await graphState()).links
 await dragPort(
-  `.graph-port[data-node-id="${secondKs}"][data-direction="out"][data-port-index="0"]`,
-  `.graph-port[data-node-id="${firstKs}"][data-direction="in"][data-port-index="2"]`,
+  `.graph-port[data-node-id="${secondMath}"][data-direction="out"][data-port-index="0"]`,
+  `.graph-port[data-node-id="${firstMath}"][data-direction="in"][data-port-index="0"]`,
 )
 const cycle = await page.evaluate(() => ({
   links: window.__graphDebug.graph.links.size,
   toasts: [...document.querySelectorAll('.toast')].map((element) => element.textContent).join(' | '),
 }))
-check('同类连线可建立（环路前置）', forwardLinks === 7, `${forwardLinks} 条`)
-check('环路被拦截', cycle.links === 7, `${cycle.links} 条`)
+check('同类连线可建立（环路前置）', forwardLinks === 1, `${forwardLinks} 条`)
+check('环路被拦截', cycle.links === 1, `${cycle.links} 条`)
 check('环路给出提示', /循环依赖/.test(cycle.toasts), cycle.toasts)
 
 // ⑥ 100 节点渲染性能 + 撤销
@@ -136,12 +154,12 @@ const perf = await page.evaluate(() => {
   const api = window.__graphDebug
   const nodes = Array.from({ length: 100 }, (_, index) => ({
     id: index + 1,
-    type: 'latent/EmptyLatentImage',
+    type: 'shader/Float',
     pos: [(index % 10) * 260, Math.floor(index / 10) * 200],
-    size: [220, 136],
+    size: [160, 90],
     inputs: [],
     outputs: [],
-    widgets_values: [512, 512, 1],
+    widgets_values: [1],
   }))
   const result = api.importWorkflow({ nodes, links: [], config: { schema_version: 1 } })
   const count = api.graph.nodes.length
@@ -190,7 +208,7 @@ const undoCount = (await graphState()).nodes
 await page.evaluate(() => window.__graphDebug.redo())
 await page.waitForTimeout(300)
 const redoCount = (await graphState()).nodes
-check('撤销/重做恢复 100 节点导入', undoCount === 6 && redoCount === 100, `${undoCount} → ${redoCount}`)
+check('撤销/重做恢复 100 节点导入', undoCount === 2 && redoCount === 100, `${undoCount} → ${redoCount}`)
 
 await page.evaluate((workflow) => window.__graphDebug.importWorkflow(workflow), originalWorkflow)
 await page.evaluate(() => window.__graphDebug.setView(1, 0, 0))
@@ -221,7 +239,7 @@ await persistPage.goto(url, { waitUntil: 'networkidle' })
 await persistPage.waitForFunction(() => Boolean(window.__graphDebug))
 await persistPage.waitForSelector('.graph-port')
 const persistedBefore = await persistPage.evaluate(() => window.__graphDebug.graph.nodes.length)
-await persistPage.getByRole('button', { name: /VAE 解码/ }).click()
+await persistPage.getByRole('button', { name: /Vec3/ }).click()
 await persistPage.waitForTimeout(300)
 await persistPage.evaluate(() => window.__graphDebug.saveNow())
 const persistedAdded = await persistPage.evaluate(() => window.__graphDebug.graph.nodes.length)
@@ -261,13 +279,13 @@ for (const width of [1280, 1920]) {
   )
 }
 
-// ⑩ 仓库内的示例 JSON 可直接导入
-const sampleFile = JSON.parse(readFileSync('examples/text-to-image.workflow.json', 'utf8'))
+// ⑩ 仓库内的 3D 示例 JSON 可直接导入
+const sampleFile = JSON.parse(readFileSync('examples/shader-demo.workflow.json', 'utf8'))
 const fileImport = await page.evaluate((workflow) => {
   const result = window.__graphDebug.importWorkflow(workflow)
   return { ok: result.ok, nodes: window.__graphDebug.graph.nodes.length, links: window.__graphDebug.graph.links.size }
 }, sampleFile)
-check('示例 JSON 可导入', fileImport.ok && fileImport.nodes === 5 && fileImport.links === 6, `${fileImport.nodes} / ${fileImport.links}`)
+check('示例 JSON 可导入', fileImport.ok && fileImport.nodes === 11 && fileImport.links === 8, `${fileImport.nodes} / ${fileImport.links}`)
 
 check('无页面异常', pageErrors.length === 0, `${pageErrors.length} 个`)
 

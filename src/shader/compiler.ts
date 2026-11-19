@@ -27,6 +27,7 @@ export interface MeshSettings {
   shape: MeshShape
   assetId: string
   scale: number
+  wireframe: boolean
 }
 
 export type LightType = 'ambient' | 'directional' | 'point'
@@ -150,6 +151,7 @@ function readMesh(workflow: WorkflowUI, rootId: number | null): MeshSettings | n
     shape: isMeshShape(shapeText) ? shapeText : 'box',
     assetId: String(readWidgetValue(meshNode, 'assetId') ?? ''),
     scale: readNumber(readWidgetValue(meshNode, 'scale'), 1),
+    wireframe: readWidgetValue(meshNode, 'wireframe') === true,
   }
 }
 
@@ -376,7 +378,7 @@ export function compileWorkflow(workflow: WorkflowUI): CompiledProgram {
     },
     postfxChain: collectPostFXChain(workflow, activeOutput?.id ?? null),
     shading,
-    mesh: meshSettings ?? { shape: 'box', assetId: '', scale: 1 },
+    mesh: meshSettings ?? { shape: 'box', assetId: '', scale: 1, wireframe: false },
     meshFromNode: meshSettings !== null,
     activeRootId: activeRoot?.id ?? null,
     activeOutputId: activeOutput?.id ?? null,

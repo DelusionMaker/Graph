@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { useGraphActions } from '../graph/actions'
-import { SAMPLE_WORKFLOW, SHADER_DEMO_WORKFLOW } from '../graph/samples'
+import { SHADER_DEMO_WORKFLOW } from '../graph/samples'
 import { useToastStore } from '../graph/toastStore'
 import { useUiStore } from '../graph/uiStore'
 import type { WorkflowUI } from '../graph/workflow'
@@ -22,7 +22,6 @@ export function HeaderActions() {
   const undo = useGraphActions((state) => state.undo)
   const redo = useGraphActions((state) => state.redo)
   const exportWorkflow = useGraphActions((state) => state.exportWorkflow)
-  const exportPrompt = useGraphActions((state) => state.exportPrompt)
   const importWorkflow = useGraphActions((state) => state.importWorkflow)
   const fitView = useGraphActions((state) => state.fitView)
   const theme = useUiStore((state) => state.theme)
@@ -74,18 +73,6 @@ export function HeaderActions() {
         }}
       >
         导出工作流
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          const prompt = exportPrompt()
-          if (prompt) downloadJson('prompt.json', prompt)
-        }}
-      >
-        导出执行格式
-      </button>
-      <button type="button" onClick={() => loadSample(SAMPLE_WORKFLOW, '已载入示例工作流')}>
-        载入示例
       </button>
       <button type="button" onClick={() => loadSample(SHADER_DEMO_WORKFLOW, '已载入 3D 示例')}>
         载入 3D 示例

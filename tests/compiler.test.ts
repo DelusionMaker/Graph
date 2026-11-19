@@ -58,7 +58,7 @@ describe('compileWorkflow', () => {
   it('空图输出默认 Box + 白材质', () => {
     const program = compileWorkflow(makeWorkflow([], []))
     expect(program.shading).toBe('pbr')
-    expect(program.mesh).toEqual({ shape: 'box', assetId: '', scale: 1 })
+    expect(program.mesh).toEqual({ shape: 'box', assetId: '', scale: 1, wireframe: false })
     expect(program.pbr).toBeNull()
     expect(program.unlit).toBeNull()
     expect(program.postfxChain).toEqual([])
@@ -138,6 +138,31 @@ describe('compileWorkflow', () => {
     }
     expect(computeSignature(changed)).toBe(program.hash)
     expect(refreshProgram(changed, program).mesh.scale).toBe(2.5)
+  })
+
+  it('wireframe 变化通过 refreshProgram 生效且不重编译', () => {
+    const workflow = makeWorkflow(
+      [
+        makeNode(1, 'scene/Mesh', ['sphere', '', 1, false]),
+        makeNode(2, 'scene/Root'),
+        makeNode(3, 'material/Surface', ['pbr', '#ff0000', 0.5, 0.2, '#000000']),
+      ],
+      [
+        [1, 1, 0, 2, 0, 'GEOMETRY'],
+        [2, 3, 0, 2, 1, 'MATERIAL'],
+      ],
+    )
+    const program = compileWorkflow(workflow)
+    expect(program.mesh.wireframe).toBe(false)
+
+    const changed: WorkflowUI = {
+      ...workflow,
+      nodes: workflow.nodes.map((node) =>
+        node.id === 1 ? { ...node, widgets_values: ['sphere', '', 1, true] } : node,
+      ),
+    }
+    expect(computeSignature(changed)).toBe(program.hash)
+    expect(refreshProgram(changed, program).mesh.wireframe).toBe(true)
   })
 
   it('断开必需输入时抛 CompileError 并带 nodeId', () => {

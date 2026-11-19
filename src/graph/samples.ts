@@ -1,100 +1,8 @@
 import type { WorkflowUI } from './workflow'
 
 /**
- * 示例工作流：加载器 → 文本编码 → KSampler → VAE 解码。
- * 与 seed 的区别：这是一份完整可执行、带连线的工作流，可通过"载入示例"一键导入。
- */
-export const SAMPLE_WORKFLOW: WorkflowUI = {
-  last_node_id: 5,
-  last_link_id: 6,
-  nodes: [
-    {
-      id: 1,
-      type: 'loaders/CheckpointLoader',
-      title: 'Checkpoint 加载器',
-      pos: [60, 100],
-      size: [220, 124],
-      mode: 0,
-      inputs: [],
-      outputs: [
-        { name: 'MODEL', type: 'MODEL', links: [2] },
-        { name: 'CLIP', type: 'CLIP', links: [1] },
-        { name: 'VAE', type: 'VAE', links: [6] },
-      ],
-      widgets_values: ['sd15.safetensors'],
-      widget_names: ['ckpt_name'],
-    },
-    {
-      id: 2,
-      type: 'conditioning/CLIPTextEncode',
-      title: 'CLIP 文本编码',
-      pos: [360, 60],
-      size: [220, 84],
-      mode: 0,
-      inputs: [{ name: 'CLIP', type: 'CLIP', link: 1 }],
-      outputs: [{ name: 'CONDITIONING', type: 'CONDITIONING', links: [3] }],
-      widgets_values: ['a cinematic photo of a mountain lake, golden hour'],
-      widget_names: ['text'],
-    },
-    {
-      id: 3,
-      type: 'sampling/KSampler',
-      title: 'KSampler',
-      pos: [660, 140],
-      size: [220, 254],
-      mode: 0,
-      inputs: [
-        { name: 'MODEL', type: 'MODEL', link: 2 },
-        { name: 'CONDITIONING', type: 'CONDITIONING', link: 3 },
-        { name: 'LATENT', type: 'LATENT', link: 4 },
-      ],
-      outputs: [{ name: 'LATENT', type: 'LATENT', links: [5] }],
-      widgets_values: [42, 25, 7.5, 'dpmpp_2m', 'karras', 1],
-      widget_names: ['seed', 'steps', 'cfg', 'sampler', 'scheduler', 'denoise'],
-    },
-    {
-      id: 4,
-      type: 'latent/EmptyLatentImage',
-      title: '空潜空间图像',
-      pos: [360, 420],
-      size: [220, 136],
-      mode: 0,
-      inputs: [],
-      outputs: [{ name: 'LATENT', type: 'LATENT', links: [4] }],
-      widgets_values: [768, 512, 1],
-      widget_names: ['width', 'height', 'batch_size'],
-    },
-    {
-      id: 5,
-      type: 'image/VAEDecode',
-      title: 'VAE 解码',
-      pos: [960, 160],
-      size: [220, 78],
-      mode: 0,
-      inputs: [
-        { name: 'LATENT', type: 'LATENT', link: 5 },
-        { name: 'VAE', type: 'VAE', link: 6 },
-      ],
-      outputs: [{ name: 'IMAGE', type: 'IMAGE', links: [] }],
-      widgets_values: [],
-      widget_names: [],
-    },
-  ],
-  links: [
-    [1, 1, 1, 2, 0, 'CLIP'],
-    [2, 1, 0, 3, 0, 'MODEL'],
-    [3, 2, 0, 3, 1, 'CONDITIONING'],
-    [4, 4, 0, 3, 2, 'LATENT'],
-    [5, 3, 0, 5, 0, 'LATENT'],
-    [6, 1, 2, 5, 1, 'VAE'],
-  ],
-  groups: [],
-  config: { schema_version: 1 },
-}
-
-/**
- * 3D / shader 示例：Mesh + Color/Float + Surface + Environment + Bloom。
- * 用于快速验证编译器、材质注入与后处理链。
+ * 3D / shader 示例：完整的场景、材质、光照与后处理链。
+ * 用于启动种子、一键载入与编译器验收。
  */
 export const SHADER_DEMO_WORKFLOW: WorkflowUI = {
   last_node_id: 11,
@@ -109,8 +17,8 @@ export const SHADER_DEMO_WORKFLOW: WorkflowUI = {
       mode: 0,
       inputs: [],
       outputs: [{ name: 'geometry', type: 'GEOMETRY', links: [1] }],
-      widgets_values: ['sphere', '', 1],
-      widget_names: ['shape', 'assetId', 'scale'],
+      widgets_values: ['sphere', '', 1, false],
+      widget_names: ['shape', 'assetId', 'scale', 'wireframe'],
     },
     {
       id: 2,

@@ -18,7 +18,7 @@ function makeNode(id, type, pos, size, inputs, outputs, widgets) {
 function buildWorkflow(options = {}) {
   const { shape = 'sphere', postfx = [], extraNodes = [], extraLinks = [] } = options
   const nodes = [
-    makeNode(1, 'scene/Mesh', [40, 40], [220, 120], [], [{ name: 'geometry', type: 'GEOMETRY', links: [1] }], [shape, '', 1]),
+    makeNode(1, 'scene/Mesh', [40, 40], [220, 120], [], [{ name: 'geometry', type: 'GEOMETRY', links: [1] }], [shape, '', 1, false]),
     makeNode(2, 'scene/Root', [640, 40], [200, 100], [
       { name: 'geometry', type: 'GEOMETRY', link: 1 },
       { name: 'material', type: 'MATERIAL', link: 4 },
@@ -233,6 +233,16 @@ check(
   `${uniformBefore} → ${state.uniforms.u_5_value?.value}`,
 )
 
+// ---------- 线框模式 ----------
+const hashBeforeWireframe = (await programState()).hash
+await page.locator('.viewer-shapes button', { hasText: '线框' }).click()
+await page.waitForTimeout(450)
+state = await programState()
+check('线框写回 Mesh 节点', state.mesh?.wireframe === true, String(state.mesh?.wireframe))
+check('线框不触发重编译', state.hash === hashBeforeWireframe, state.hash)
+await page.locator('.viewer-shapes button', { hasText: '线框' }).click()
+await page.waitForTimeout(450)
+
 // ---------- Surface 兜底常量 ----------
 // metalness 未连线，应使用节点上的兜底 widget
 await editWidget(4, 'metalness', 0.7)
@@ -327,7 +337,7 @@ const textureWorkflow = {
   last_node_id: 4,
   last_link_id: 3,
   nodes: [
-    makeNode(1, 'scene/Mesh', [40, 40], [220, 140], [], [{ name: 'geometry', type: 'GEOMETRY', links: [1] }], ['box', '', 1]),
+    makeNode(1, 'scene/Mesh', [40, 40], [220, 140], [], [{ name: 'geometry', type: 'GEOMETRY', links: [1] }], ['box', '', 1, false]),
     makeNode(2, 'scene/Root', [700, 40], [200, 80], [
       { name: 'geometry', type: 'GEOMETRY', link: 1 },
       { name: 'material', type: 'MATERIAL', link: 3 },

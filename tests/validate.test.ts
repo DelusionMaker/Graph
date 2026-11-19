@@ -44,9 +44,9 @@ describe('isValidTypePair', () => {
     expect(isValidTypePair('VEC3', 'VEC2')).toBe(false)
   })
 
-  it('既有 ComfyUI 类型不受域隔离影响', () => {
-    expect(isValidTypePair('MODEL', 'MODEL')).toBe(true)
-    expect(isValidTypePair('MODEL', 'CLIP')).toBe(false)
-    expect(isValidTypePair('LATENT', 'IMAGE')).toBe(false)
+  it('资源与光照类型保持域隔离', () => {
+    expect(isValidTypePair('GEOMETRY', 'GEOMETRY')).toBe(true)
+    expect(isValidTypePair('GEOMETRY', 'MATERIAL')).toBe(false)
+    expect(isValidTypePair('LIGHT', 'LIGHTS')).toBe(false)
   })
 })

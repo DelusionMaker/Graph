@@ -6,7 +6,7 @@
 > **技术栈基线**：React 18 + TypeScript + Vite 6 + Zustand 5 + `@comfyorg/litegraph@0.17.2` + R3F v8 系列  
 > **前置依赖（已实现）**：主文档阶段 0–5 已完成（`README.md` 自述）。当前事实：
 > - 桥接层 `src/graph/useLiteGraphBridge.ts` 驱动 LGraph ↔ `useGraphStore` 镜像；`canvas.ds` 是画布视口唯一真相源。
-> - 节点定义拆分为纯数据 `src/graph/nodeDefinitions.ts`（5 个 ComfyUI 节点 + 23 个场景/光照/shader/postfx 节点），注册在 `nodeRegistry.ts`；端口类型 22 项。
+> - 节点定义拆分为纯数据 `src/graph/nodeDefinitions.ts`（23 个场景/材质/光照/shader/postfx 节点），注册在 `nodeRegistry.ts`；端口类型 13 项。ComfyUI 专属节点与执行格式导出已移除。
 > - 双格式模型 `WorkflowUI` / `PromptAPI`、`parseWorkflow` 三级校验、`toPromptAPI` 已实现；**`SCHEMA_VERSION = 2`**，`migrateWorkflow` 已实现 v1 → v2。
 > - 已落地：`src/graph/coords.ts` 统一坐标转换；桥接层 `commit()` 串联历史/持久化/`invalidateProgram()`；端口文本继续读 `port.name`（不引入 `getPortDisplayText`）。
 > - 已落地：three 0.169 / R3F 8.18 / drei 9.122 / postprocessing 2.19 / `@types/three` 0.169；3D 视口、编译器、后处理、性能 HUD 均可用。
@@ -167,7 +167,7 @@ export type PortType = (typeof PORT_TYPES)[number]
 
 ### 3.2 节点目录（v1 全量）
 
-既有 5 个 ComfyUI 节点（`loaders/CheckpointLoader`、`conditioning/CLIPTextEncode`、`sampling/KSampler`、`latent/EmptyLatentImage`、`image/VAEDecode`）保持不动。以下 23 个为新增，统一注册进 `nodeRegistry.ts`：
+当前共 23 个节点，统一注册进 `nodeRegistry.ts`：
 
 **场景与材质域**
 
@@ -349,7 +349,7 @@ export interface CompiledProgram {
   pbr: { vertexShader: string; fragmentShader: string } | null  // 自定义 PBR shader
   postfxChain: PostFXDescriptor[]
   shading: 'pbr' | 'unlit'
-  mesh: { shape: 'box' | 'sphere' | 'torusknot' | 'gltf'; assetId: string; scale: number }
+  mesh: { shape: 'box' | 'sphere' | 'torusknot' | 'gltf'; assetId: string; scale: number; wireframe: boolean }
   meshFromNode: boolean              // false 时视口回退到工具条状态
   activeRootId: number | null
   activeOutputId: number | null
@@ -694,6 +694,8 @@ src/
 | 调试导出 | 直接 `graphToWorkflow` | 走 `useGraphActions.exportWorkflow()` | 保证导出包含 `shader_extension.viewer` |
 | postfx 效果文件 | `effects/{Bloom,...}.tsx` | 内联在 `PostFXStack.tsx` | 每个效果只有几行 JSX，拆文件收益低 |
 | 光照与阴影 | three 的 `Light` + `MeshStandardMaterial.onBeforeCompile` | 独立光照节点 + 自定义 GGX PBR shader + 自建 depth pass / PCF | 参数与计算完全由节点和 shader 控制，不使用 three 的光照模型 |
+| ComfyUI 基础节点 | 5 个加载器/采样/潜空间/解码节点与 `toPromptAPI` 执行格式 | 全部移除；工作区只保留 UI 格式（工作流 JSON） | 项目收敛为 3D / Shader 节点编辑器，不再提供 ComfyUI 后端提交能力 |
+| 启动种子 | `seed.ts` 创建 4 个无连线基础节点 | `samples.ts` 的 3D 示例去掉连线后作为种子 | 视口启动即有可渲染场景，同时保留“从零连线”的交互基线 |
 | `render/Environment` | 单一节点配置光照与阴影 | 拆成 Ambient / Directional / Point / LightRig / Shadow 五个节点 | 光照与阴影可独立选择、组合与调参 |
 
 **v3.1 光照实现要点**：

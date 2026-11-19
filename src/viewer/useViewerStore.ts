@@ -19,6 +19,8 @@ interface ViewerState {
   gltfUrl: string | null
   gltfName: string | null
   modelScale: number
+  /** 线框模式（无 scene/Mesh 节点时由工具条兜底） */
+  wireframe: boolean
   /** R3F 帧循环：性能观察模式或存在 shader/Time 节点时为 always */
   frameloop: Frameloop
   perfMode: boolean
@@ -28,6 +30,7 @@ interface ViewerState {
   setShape: (shape: MeshShape) => void
   setGltf: (url: string | null, name?: string | null) => void
   setModelScale: (scale: number) => void
+  setWireframe: (wireframe: boolean) => void
   setFrameloop: (frameloop: Frameloop) => void
   setPerfMode: (perfMode: boolean) => void
   setDockOpen: (dockOpen: boolean) => void
@@ -39,6 +42,7 @@ export const useViewerStore = create<ViewerState>((set) => ({
   gltfUrl: null,
   gltfName: null,
   modelScale: 1,
+  wireframe: false,
   frameloop: 'demand',
   perfMode: false,
   dockOpen: false,
@@ -46,6 +50,7 @@ export const useViewerStore = create<ViewerState>((set) => ({
   setShape: (shape) => set({ shape }),
   setGltf: (gltfUrl, gltfName = null) => set({ gltfUrl, gltfName, shape: gltfUrl ? 'gltf' : 'box' }),
   setModelScale: (modelScale) => set({ modelScale }),
+  setWireframe: (wireframe) => set({ wireframe }),
   setFrameloop: (frameloop) => set({ frameloop }),
   setPerfMode: (perfMode) => set({ perfMode, frameloop: perfMode ? 'always' : 'demand' }),
   setDockOpen: (dockOpen) => set({ dockOpen }),
