@@ -2,7 +2,7 @@ import { useEffect, useState, type RefObject } from 'react'
 import { LGraph, LGraphCanvas, LGraphNode, LiteGraph, type LLink } from '@comfyorg/litegraph'
 import '@comfyorg/litegraph/style.css'
 import { resetGraphActions, useGraphActions } from './actions'
-import { beginConnectionGesture, endConnectionGesture } from './connectionFeedback'
+import { beginConnectionGesture, clearConnectionError, endConnectionGesture } from './connectionFeedback'
 import { canvasPointToGraph, centerOffset, readViewport } from './coords'
 import { SnapshotHistory } from './history'
 import { getNodeDefinition, registerNodeDefinitions } from './nodeRegistry'
@@ -54,6 +54,21 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
     canvas.render_shadows = false
     // 关闭 FPS/节点计数调试信息（默认会画在画布左下角）
     canvas.show_info = false
+
+    // 类型校验是"试探性"的：拖拽经过节点时 LiteGraph 会遍历所有候选槽位，
+    // 途中扫到的不匹配槽位会留下与落点无关的错误提示。
+    // 连线真正建立、或落在空白处（本就不该报类型错误）时把它清掉，松手后不再误报。
+    const connectorEvents = canvas.linkConnector.events
+    const onLinkCreated = (event: CustomEvent<LLink | null | undefined>) => {
+      // 被 canConnectToInput 拦下的落点不会触发该事件，detail 为空即未生成连线
+      if (event.detail) clearConnectionError()
+    }
+    const onLinkMoved = () => clearConnectionError()
+    const onDroppedOnCanvas = () => clearConnectionError()
+    connectorEvents.addEventListener('link-created', onLinkCreated)
+    connectorEvents.addEventListener('input-moved', onLinkMoved)
+    connectorEvents.addEventListener('output-moved', onLinkMoved)
+    connectorEvents.addEventListener('dropped-on-canvas', onDroppedOnCanvas)
 
     // 浅色主题需要一张浅色网格图（默认的深色网格图叠加在浅底上会发灰）
     const createGridImage = (stroke: string, step = 20): string | null => {
@@ -642,6 +657,11 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
       canvas.onSelectionChange = undefined
       canvas.ds.onChanged = undefined
       canvas.drawFrontCanvas = originalDrawFrontCanvas
+
+      connectorEvents.removeEventListener('link-created', onLinkCreated)
+      connectorEvents.removeEventListener('input-moved', onLinkMoved)
+      connectorEvents.removeEventListener('output-moved', onLinkMoved)
+      connectorEvents.removeEventListener('dropped-on-canvas', onDroppedOnCanvas)
 
       graph.stop()
       canvas.unbindEvents()
