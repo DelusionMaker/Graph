@@ -22,7 +22,13 @@ export function Widget({ nodeId, widget, label }: Props) {
   )
 }
 
-function WidgetControl({ widget, onChange }: { widget: WidgetSnapshot; onChange: (value: unknown) => void }) {
+function WidgetControl({
+  widget,
+  onChange,
+}: {
+  widget: WidgetSnapshot
+  onChange: (value: unknown) => void
+}) {
   switch (widget.kind) {
     case 'combo':
       return (

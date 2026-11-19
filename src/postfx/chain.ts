@@ -28,7 +28,10 @@ function toDescriptor(node: UINode, type: PostFXDescriptor['type']): PostFXDescr
  * 从 PostFX Output 的输入端口逆序收集整条链，返回**从先到后**的执行顺序。
  * 链为空、上游不是效果节点或遇到环时停止并返回已收集部分。
  */
-export function collectPostFXChain(workflow: WorkflowUI, outputId: number | null): PostFXDescriptor[] {
+export function collectPostFXChain(
+  workflow: WorkflowUI,
+  outputId: number | null,
+): PostFXDescriptor[] {
   if (outputId == null) return []
   const nodeById = new Map(workflow.nodes.map((node) => [node.id, node]))
   const output = nodeById.get(outputId)
@@ -45,7 +48,8 @@ export function collectPostFXChain(workflow: WorkflowUI, outputId: number | null
     visited.add(current.id)
     const definition = getNodeDefinition(current.type)
     // Output 的输入叫 effects，效果节点的输入叫 in；两者都只有这一个输入端口
-    const inputSlot = definition?.inputs.findIndex((input) => input.name === 'in' || input.name === 'effects') ?? -1
+    const inputSlot =
+      definition?.inputs.findIndex((input) => input.name === 'in' || input.name === 'effects') ?? -1
     if (inputSlot < 0) break
 
     const link = linkByTarget.get(`${current.id}:${inputSlot}`)

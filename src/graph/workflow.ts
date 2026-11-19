@@ -128,7 +128,12 @@ function isKnownPortType(type: string): type is PortType {
   return (PORT_TYPES as readonly string[]).includes(type)
 }
 
-function readPorts(value: unknown, nodeId: number, kind: '输入' | '输出', issues: ImportIssue[]): PortDef[] {
+function readPorts(
+  value: unknown,
+  nodeId: number,
+  kind: '输入' | '输出',
+  issues: ImportIssue[],
+): PortDef[] {
   if (!Array.isArray(value)) return []
   const ports: PortDef[] = []
 
@@ -171,7 +176,10 @@ export function parseWorkflow(raw: unknown): ParseResult {
   // 未写版本号的旧文档按 v1 处理，确保能补上 shader_extension
   const rawVersion = Number(rawConfig.schema_version ?? 1)
   if (!Number.isInteger(rawVersion) || rawVersion < 1) {
-    return { workflow: null, issues: [{ level: 1, message: `非法的 schema_version：${rawConfig.schema_version}` }] }
+    return {
+      workflow: null,
+      issues: [{ level: 1, message: `非法的 schema_version：${rawConfig.schema_version}` }],
+    }
   }
   if (rawVersion > SCHEMA_VERSION) {
     return {
@@ -203,7 +211,11 @@ export function parseWorkflow(raw: unknown): ParseResult {
       outputs: readPorts(item.outputs, item.id, '输出', issues),
       widgets_values: Array.isArray(item.widgets_values) ? [...item.widgets_values] : [],
       ...(Array.isArray(item.widget_names)
-        ? { widget_names: item.widget_names.filter((name): name is string => typeof name === 'string') }
+        ? {
+            widget_names: item.widget_names.filter(
+              (name): name is string => typeof name === 'string',
+            ),
+          }
         : {}),
     }
     nodes.push(node)
@@ -233,7 +245,12 @@ export function parseWorkflow(raw: unknown): ParseResult {
       issues.push({ level: 2, message: `连线 ${id} 的端点节点不存在，已丢弃` })
       continue
     }
-    if (originSlot < 0 || originSlot >= origin.outputs.length || targetSlot < 0 || targetSlot >= target.inputs.length) {
+    if (
+      originSlot < 0 ||
+      originSlot >= origin.outputs.length ||
+      targetSlot < 0 ||
+      targetSlot >= target.inputs.length
+    ) {
       issues.push({ level: 2, message: `连线 ${id} 的槽位越界，已丢弃` })
       continue
     }
@@ -276,16 +293,8 @@ export function parseWorkflow(raw: unknown): ParseResult {
       })
     : []
 
-  const lastNodeId = Math.max(
-    Number(raw.last_node_id) || 0,
-    ...nodes.map((node) => node.id),
-    0,
-  )
-  const lastLinkId = Math.max(
-    Number(raw.last_link_id) || 0,
-    ...links.map((link) => link[0]),
-    0,
-  )
+  const lastNodeId = Math.max(Number(raw.last_node_id) || 0, ...nodes.map((node) => node.id), 0)
+  const lastLinkId = Math.max(Number(raw.last_link_id) || 0, ...links.map((link) => link[0]), 0)
 
   const workflow: WorkflowUI = {
     last_node_id: lastNodeId,

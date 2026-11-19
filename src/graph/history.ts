@@ -56,7 +56,12 @@ export class SnapshotHistory {
     const now = this.now()
     const coalesce = options.coalesce === true
     // 只合并"连续同类"的高频操作：一次拖拽不会并进前一次调参
-    if (coalesce && this.lastCoalesce && this.index >= 0 && now - this.lastPushAt < this.coalesceWindowMs) {
+    if (
+      coalesce &&
+      this.lastCoalesce &&
+      this.index >= 0 &&
+      now - this.lastPushAt < this.coalesceWindowMs
+    ) {
       this.entries[this.index] = snapshot
       this.lastPushAt = now
       return true

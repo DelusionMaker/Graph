@@ -12,10 +12,7 @@ import {
  * LGraph → UI 格式（带布局，可直接 JSON 化）。
  * extraConfig 用于写入 config 下的扩展状态（如 shader_extension.viewer）。
  */
-export function graphToWorkflow(
-  graph: LGraph,
-  extraConfig?: Record<string, unknown>,
-): WorkflowUI {
+export function graphToWorkflow(graph: LGraph, extraConfig?: Record<string, unknown>): WorkflowUI {
   const nodes: UINode[] = graph.nodes.map((node) => ({
     id: Number(node.id),
     type: node.type,
@@ -60,7 +57,11 @@ export function graphToWorkflow(
  * UI 格式 → LGraph：清空后重建。
  * 未知节点类型会被跳过并记录（引用完整性），其余节点保持原有 id 与布局。
  */
-export function applyWorkflow(graph: LGraph, canvas: LGraphCanvas, workflow: WorkflowUI): ImportIssue[] {
+export function applyWorkflow(
+  graph: LGraph,
+  canvas: LGraphCanvas,
+  workflow: WorkflowUI,
+): ImportIssue[] {
   const issues: ImportIssue[] = []
 
   canvas.deselectAll()

@@ -229,14 +229,12 @@ describe('compileWorkflow', () => {
 
   it('未连接灯光组时回退默认光照', () => {
     const program = compileWorkflow(
-      makeWorkflow([makeNode(1, 'scene/Root'), makeNode(2, 'material/Surface', ['pbr'])], [
-        [1, 2, 0, 1, 1, 'MATERIAL'],
-      ]),
+      makeWorkflow(
+        [makeNode(1, 'scene/Root'), makeNode(2, 'material/Surface', ['pbr'])],
+        [[1, 2, 0, 1, 1, 'MATERIAL']],
+      ),
     )
-    expect(program.lighting.lights.map((light) => light.type)).toEqual([
-      'ambient',
-      'directional',
-    ])
+    expect(program.lighting.lights.map((light) => light.type)).toEqual(['ambient', 'directional'])
   })
 
   it('多个 Scene Root 时使用 id 最小者并警告', () => {

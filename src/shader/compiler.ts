@@ -113,7 +113,7 @@ function findUpstream(
   const slot = definition?.inputs.findIndex((input) => input.name === portName) ?? -1
   if (slot < 0) return null
   const link = linkByTarget.get(`${node.id}:${slot}`)
-  return link ? nodeById.get(link[1]) ?? null : null
+  return link ? (nodeById.get(link[1]) ?? null) : null
 }
 
 /** 多个终端时按 config 指定，未指定取 id 最小者 */
@@ -271,7 +271,10 @@ function readShadow(
   return {
     mapSize: Number(readWidgetValue(node, 'mapSize')) === 2048 ? 2048 : 1024,
     bias: readNumber(readWidgetValue(node, 'bias'), 0.0015),
-    softness: Math.max(1, Math.min(4, Math.round(readNumber(readWidgetValue(node, 'softness'), 1)))),
+    softness: Math.max(
+      1,
+      Math.min(4, Math.round(readNumber(readWidgetValue(node, 'softness'), 1))),
+    ),
   }
 }
 
@@ -307,7 +310,8 @@ export function compileWorkflow(workflow: WorkflowUI): CompiledProgram {
       },
       uniform: (suffix, kind, value, source) => {
         const name = `u_${node.id}_${suffix}`
-        uniforms[name] = kind === 'time' ? { type: kind, value, animated: true } : { type: kind, value }
+        uniforms[name] =
+          kind === 'time' ? { type: kind, value, animated: true } : { type: kind, value }
         uniformSources[name] = source
         declarations.push(`uniform ${glslType(kind)} ${name};`)
         return name
@@ -433,8 +437,7 @@ export function refreshProgram(workflow: WorkflowUI, previous: CompiledProgram):
 
   const meshSettings = readMesh(workflow, previous.activeRootId)
   const { nodeById, linkByTarget } = indexWorkflow(workflow)
-  const root =
-    previous.activeRootId != null ? nodeById.get(previous.activeRootId) ?? null : null
+  const root = previous.activeRootId != null ? (nodeById.get(previous.activeRootId) ?? null) : null
 
   return {
     ...previous,

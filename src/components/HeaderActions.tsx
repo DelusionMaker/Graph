@@ -87,7 +87,13 @@ export function HeaderActions() {
       >
         {theme === 'dark' ? '浅色' : '深色'}
       </button>
-      <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={handleImport} />
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".json,application/json"
+        hidden
+        onChange={handleImport}
+      />
     </div>
   )
 }

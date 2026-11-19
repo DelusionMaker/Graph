@@ -18,29 +18,101 @@ function makeNode(id, type, pos, size, inputs, outputs, widgets) {
 function buildWorkflow(options = {}) {
   const { shape = 'sphere', postfx = [], extraNodes = [], extraLinks = [] } = options
   const nodes = [
-    makeNode(1, 'scene/Mesh', [40, 40], [220, 120], [], [{ name: 'geometry', type: 'GEOMETRY', links: [1] }], [shape, '', 1, false]),
-    makeNode(2, 'scene/Root', [640, 40], [200, 100], [
-      { name: 'geometry', type: 'GEOMETRY', link: 1 },
-      { name: 'material', type: 'MATERIAL', link: 4 },
-      { name: 'lights', type: 'LIGHTS', link: 11 },
-      { name: 'shadow', type: 'SHADOW', link: 12 },
-    ], [], []),
-    makeNode(3, 'shader/Color', [40, 240], [180, 100], [], [{ name: 'color', type: 'COLOR', links: [2] }], ['#ff3355']),
-    makeNode(4, 'material/Surface', [320, 240], [220, 180], [
-      { name: 'baseColor', type: 'COLOR', link: 2 },
-      { name: 'roughness', type: 'FLOAT', link: 3 },
-      { name: 'metalness', type: 'FLOAT', link: null },
-      { name: 'emissive', type: 'COLOR', link: null },
-    ], [{ name: 'material', type: 'MATERIAL', links: [4] }], ['pbr']),
-    makeNode(5, 'shader/Float', [40, 480], [160, 100], [], [{ name: 'value', type: 'FLOAT', links: [3] }], [0.25]),
-    makeNode(6, 'render/AmbientLight', [700, 240], [200, 90], [], [{ name: 'light', type: 'LIGHT', links: [9] }], ['#ffffff', 0.5]),
-    makeNode(7, 'render/DirectionalLight', [700, 380], [210, 150], [], [{ name: 'light', type: 'LIGHT', links: [10] }], ['#ffffff', 1.2, -0.5, -1, -0.4]),
-    makeNode(8, 'render/LightRig', [980, 300], [190, 120], [
-      { name: 'light1', type: 'LIGHT', link: 9 },
-      { name: 'light2', type: 'LIGHT', link: 10 },
-      { name: 'light3', type: 'LIGHT', link: null },
-    ], [{ name: 'lights', type: 'LIGHTS', links: [11] }], []),
-    makeNode(9, 'render/Shadow', [980, 480], [200, 150], [], [{ name: 'shadow', type: 'SHADOW', links: [12] }], ['1024', 0.0015, 2]),
+    makeNode(
+      1,
+      'scene/Mesh',
+      [40, 40],
+      [220, 120],
+      [],
+      [{ name: 'geometry', type: 'GEOMETRY', links: [1] }],
+      [shape, '', 1, false],
+    ),
+    makeNode(
+      2,
+      'scene/Root',
+      [640, 40],
+      [200, 100],
+      [
+        { name: 'geometry', type: 'GEOMETRY', link: 1 },
+        { name: 'material', type: 'MATERIAL', link: 4 },
+        { name: 'lights', type: 'LIGHTS', link: 11 },
+        { name: 'shadow', type: 'SHADOW', link: 12 },
+      ],
+      [],
+      [],
+    ),
+    makeNode(
+      3,
+      'shader/Color',
+      [40, 240],
+      [180, 100],
+      [],
+      [{ name: 'color', type: 'COLOR', links: [2] }],
+      ['#ff3355'],
+    ),
+    makeNode(
+      4,
+      'material/Surface',
+      [320, 240],
+      [220, 180],
+      [
+        { name: 'baseColor', type: 'COLOR', link: 2 },
+        { name: 'roughness', type: 'FLOAT', link: 3 },
+        { name: 'metalness', type: 'FLOAT', link: null },
+        { name: 'emissive', type: 'COLOR', link: null },
+      ],
+      [{ name: 'material', type: 'MATERIAL', links: [4] }],
+      ['pbr'],
+    ),
+    makeNode(
+      5,
+      'shader/Float',
+      [40, 480],
+      [160, 100],
+      [],
+      [{ name: 'value', type: 'FLOAT', links: [3] }],
+      [0.25],
+    ),
+    makeNode(
+      6,
+      'render/AmbientLight',
+      [700, 240],
+      [200, 90],
+      [],
+      [{ name: 'light', type: 'LIGHT', links: [9] }],
+      ['#ffffff', 0.5],
+    ),
+    makeNode(
+      7,
+      'render/DirectionalLight',
+      [700, 380],
+      [210, 150],
+      [],
+      [{ name: 'light', type: 'LIGHT', links: [10] }],
+      ['#ffffff', 1.2, -0.5, -1, -0.4],
+    ),
+    makeNode(
+      8,
+      'render/LightRig',
+      [980, 300],
+      [190, 120],
+      [
+        { name: 'light1', type: 'LIGHT', link: 9 },
+        { name: 'light2', type: 'LIGHT', link: 10 },
+        { name: 'light3', type: 'LIGHT', link: null },
+      ],
+      [{ name: 'lights', type: 'LIGHTS', links: [11] }],
+      [],
+    ),
+    makeNode(
+      9,
+      'render/Shadow',
+      [980, 480],
+      [200, 150],
+      [],
+      [{ name: 'shadow', type: 'SHADOW', links: [12] }],
+      ['1024', 0.0015, 2],
+    ),
   ]
   const links = [
     [1, 1, 0, 2, 0, 'GEOMETRY'],
@@ -60,7 +132,15 @@ function buildWorkflow(options = {}) {
     const id = 10 + index
     postfxIds.push(id)
     nodes.push(
-      makeNode(id, `postfx/${postfx[index]}`, [640, 300 + index * 80], [200, 120], [{ name: 'in', type: 'POSTFX', link: null }], [{ name: 'out', type: 'POSTFX', links: [] }], []),
+      makeNode(
+        id,
+        `postfx/${postfx[index]}`,
+        [640, 300 + index * 80],
+        [200, 120],
+        [{ name: 'in', type: 'POSTFX', link: null }],
+        [{ name: 'out', type: 'POSTFX', links: [] }],
+        [],
+      ),
     )
   }
   let previousOut = null
@@ -70,7 +150,17 @@ function buildWorkflow(options = {}) {
     previousOut = postfxIds[index]
   }
   if (previousOut !== null) {
-    nodes.push(makeNode(99, 'postfx/Output', [900, 300], [190, 110], [{ name: 'effects', type: 'POSTFX', link: nextLink - 1 }], [], []))
+    nodes.push(
+      makeNode(
+        99,
+        'postfx/Output',
+        [900, 300],
+        [190, 110],
+        [{ name: 'effects', type: 'POSTFX', link: nextLink - 1 }],
+        [],
+        [],
+      ),
+    )
   }
 
   nodes.push(...extraNodes)
@@ -97,7 +187,14 @@ function buildMinimalGlb() {
     buffers: [{ byteLength: 36 }],
     bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 36 }],
     accessors: [
-      { bufferView: 0, componentType: 5126, count: 3, type: 'VEC3', max: [1, 1, 0], min: [0, 0, 0] },
+      {
+        bufferView: 0,
+        componentType: 5126,
+        count: 3,
+        type: 'VEC3',
+        max: [1, 1, 0],
+        min: [0, 0, 0],
+      },
     ],
   })
   const jsonRaw = Buffer.from(json, 'utf8')
@@ -162,7 +259,9 @@ const deselect = async () => {
 
 const editWidget = async (nodeId, widgetName, value) => {
   await selectNode(nodeId)
-  const widget = page.locator(`[data-node-id="${nodeId}"] .graph-widget[data-widget-name="${widgetName}"]`)
+  const widget = page.locator(
+    `[data-node-id="${nodeId}"] .graph-widget[data-widget-name="${widgetName}"]`,
+  )
   const select = widget.locator('select')
   const checkbox = widget.locator('input[type="checkbox"]')
   const range = widget.locator('input[type="range"]')
@@ -212,7 +311,11 @@ const cameraBefore = (await exportWorkflow()).config.shader_extension?.viewer?.c
 const canvasBox = await page.locator('.viewport-3d canvas').boundingBox()
 await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2)
 await page.mouse.down()
-await page.mouse.move(canvasBox.x + canvasBox.width / 2 + 110, canvasBox.y + canvasBox.height / 2 + 35, { steps: 10 })
+await page.mouse.move(
+  canvasBox.x + canvasBox.width / 2 + 110,
+  canvasBox.y + canvasBox.height / 2 + 35,
+  { steps: 10 },
+)
 await page.mouse.up()
 await page.waitForTimeout(700)
 const cameraAfter = (await exportWorkflow()).config.shader_extension?.viewer?.camera
@@ -228,7 +331,11 @@ const hashBefore = (await programState()).hash
 const uniformBefore = (await programState()).uniforms.u_5_value?.value
 await editWidget(5, 'value', 0.75)
 state = await programState()
-check('A4/P3 改 Float 不改变 programHash', state.hash === hashBefore, `${hashBefore} → ${state.hash}`)
+check(
+  'A4/P3 改 Float 不改变 programHash',
+  state.hash === hashBefore,
+  `${hashBefore} → ${state.hash}`,
+)
 check(
   'A4/P3 uniform 已刷新',
   state.uniforms.u_5_value?.value === 0.75,
@@ -265,10 +372,18 @@ withoutShadow.nodes.find((node) => node.id === 2).inputs = withoutShadow.nodes
   .inputs.filter((port) => port.name !== 'shadow')
 await importWorkflow(withoutShadow)
 state = await programState()
-check('A6 断开阴影连线后无阴影', state.lighting?.shadow == null, JSON.stringify(state.lighting?.shadow))
+check(
+  'A6 断开阴影连线后无阴影',
+  state.lighting?.shadow == null,
+  JSON.stringify(state.lighting?.shadow),
+)
 await importWorkflow(buildWorkflow())
 state = await programState()
-check('A6 接入阴影节点后启用', state.lighting?.shadow != null, JSON.stringify(state.lighting?.shadow))
+check(
+  'A6 接入阴影节点后启用',
+  state.lighting?.shadow != null,
+  JSON.stringify(state.lighting?.shadow),
+)
 await editWidget(7, 'intensity', 6)
 state = await programState()
 check(
@@ -307,7 +422,15 @@ check(
 // ---------- A10 编译错误 ----------
 const broken = buildWorkflow({
   extraNodes: [
-    makeNode(21, 'shader/Math', [40, 620], [170, 120], [{ name: 'a', type: 'FLOAT', link: null }], [{ name: 'result', type: 'FLOAT', links: [91] }], ['mul']),
+    makeNode(
+      21,
+      'shader/Math',
+      [40, 620],
+      [170, 120],
+      [{ name: 'a', type: 'FLOAT', link: null }],
+      [{ name: 'result', type: 'FLOAT', links: [91] }],
+      ['mul'],
+    ),
   ],
   extraLinks: [[91, 21, 0, 4, 1, 'FLOAT']],
 })
@@ -339,7 +462,8 @@ check(
   reexported.nodes.length === exported.nodes.length &&
     reexported.links.length === exported.links.length &&
     reexported.config.schema_version === 2 &&
-    JSON.stringify(reexported.config.shader_extension) === JSON.stringify(exported.config.shader_extension),
+    JSON.stringify(reexported.config.shader_extension) ===
+      JSON.stringify(exported.config.shader_extension),
   `${exported.nodes.length} 节点 / ${exported.links.length} 连线 / schema ${reexported.config.schema_version}`,
 )
 
@@ -348,18 +472,50 @@ const textureWorkflow = {
   last_node_id: 4,
   last_link_id: 3,
   nodes: [
-    makeNode(1, 'scene/Mesh', [40, 40], [220, 140], [], [{ name: 'geometry', type: 'GEOMETRY', links: [1] }], ['box', '', 1, false]),
-    makeNode(2, 'scene/Root', [700, 40], [200, 80], [
-      { name: 'geometry', type: 'GEOMETRY', link: 1 },
-      { name: 'material', type: 'MATERIAL', link: 3 },
-    ], [], []),
-    makeNode(3, 'shader/Texture', [40, 260], [200, 150], [{ name: 'uv', type: 'VEC2', link: null }], [{ name: 'color', type: 'COLOR', links: [2] }], ['', 'repeat', true]),
-    makeNode(4, 'material/Surface', [340, 240], [220, 250], [
-      { name: 'baseColor', type: 'COLOR', link: 2 },
-      { name: 'roughness', type: 'FLOAT', link: null },
-      { name: 'metalness', type: 'FLOAT', link: null },
-      { name: 'emissive', type: 'COLOR', link: null },
-    ], [{ name: 'material', type: 'MATERIAL', links: [3] }], ['pbr', '#ffffff', 0.5, 0.1, '#000000']),
+    makeNode(
+      1,
+      'scene/Mesh',
+      [40, 40],
+      [220, 140],
+      [],
+      [{ name: 'geometry', type: 'GEOMETRY', links: [1] }],
+      ['box', '', 1, false],
+    ),
+    makeNode(
+      2,
+      'scene/Root',
+      [700, 40],
+      [200, 80],
+      [
+        { name: 'geometry', type: 'GEOMETRY', link: 1 },
+        { name: 'material', type: 'MATERIAL', link: 3 },
+      ],
+      [],
+      [],
+    ),
+    makeNode(
+      3,
+      'shader/Texture',
+      [40, 260],
+      [200, 150],
+      [{ name: 'uv', type: 'VEC2', link: null }],
+      [{ name: 'color', type: 'COLOR', links: [2] }],
+      ['', 'repeat', true],
+    ),
+    makeNode(
+      4,
+      'material/Surface',
+      [340, 240],
+      [220, 250],
+      [
+        { name: 'baseColor', type: 'COLOR', link: 2 },
+        { name: 'roughness', type: 'FLOAT', link: null },
+        { name: 'metalness', type: 'FLOAT', link: null },
+        { name: 'emissive', type: 'COLOR', link: null },
+      ],
+      [{ name: 'material', type: 'MATERIAL', links: [3] }],
+      ['pbr', '#ffffff', 0.5, 0.1, '#000000'],
+    ),
   ],
   links: [
     [1, 1, 0, 2, 0, 'GEOMETRY'],
@@ -437,12 +593,36 @@ check('A3 无效文件无未捕获异常', pageErrors.length === 0, pageErrors.j
 await importWorkflow(
   buildWorkflow({
     extraNodes: [
-      makeNode(30, 'shader/Math', [40, 620], [170, 120], [
-        { name: 'a', type: 'FLOAT', link: 70 },
-        { name: 'b', type: 'FLOAT', link: 71 },
-      ], [{ name: 'result', type: 'FLOAT', links: [72] }], ['mul']),
-      makeNode(31, 'shader/Float', [40, 760], [160, 100], [], [{ name: 'value', type: 'FLOAT', links: [70] }], [2]),
-      makeNode(32, 'shader/Float', [240, 760], [160, 100], [], [{ name: 'value', type: 'FLOAT', links: [71] }], [3]),
+      makeNode(
+        30,
+        'shader/Math',
+        [40, 620],
+        [170, 120],
+        [
+          { name: 'a', type: 'FLOAT', link: 70 },
+          { name: 'b', type: 'FLOAT', link: 71 },
+        ],
+        [{ name: 'result', type: 'FLOAT', links: [72] }],
+        ['mul'],
+      ),
+      makeNode(
+        31,
+        'shader/Float',
+        [40, 760],
+        [160, 100],
+        [],
+        [{ name: 'value', type: 'FLOAT', links: [70] }],
+        [2],
+      ),
+      makeNode(
+        32,
+        'shader/Float',
+        [240, 760],
+        [160, 100],
+        [],
+        [{ name: 'value', type: 'FLOAT', links: [71] }],
+        [3],
+      ),
     ],
     extraLinks: [
       [70, 31, 0, 30, 0, 'FLOAT'],
@@ -453,7 +633,9 @@ await importWorkflow(
 )
 const hashMul = (await programState()).hash
 await selectNode(30)
-await page.locator('[data-node-id="30"] .graph-widget[data-widget-name="op"] select').selectOption('add')
+await page
+  .locator('[data-node-id="30"] .graph-widget[data-widget-name="op"] select')
+  .selectOption('add')
 await page.waitForTimeout(320)
 state = await programState()
 check('P4 Math op 切换触发重编译', state.hash !== hashMul, `${hashMul} → ${state.hash}`)

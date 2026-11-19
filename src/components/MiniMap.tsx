@@ -42,7 +42,8 @@ export function MiniMap() {
   const scale = Math.min(WIDTH / (maxX - minX), HEIGHT / (maxY - minY))
   const offsetX = (WIDTH - (maxX - minX) * scale) / 2
   const offsetY = (HEIGHT - (maxY - minY) * scale) / 2
-  const project = (x: number, y: number) => [offsetX + (x - minX) * scale, offsetY + (y - minY) * scale] as const
+  const project = (x: number, y: number) =>
+    [offsetX + (x - minX) * scale, offsetY + (y - minY) * scale] as const
 
   const [viewportX, viewportY] = project(viewX, viewY)
 

@@ -48,9 +48,9 @@ export function invalidateProgram(options?: { immediate?: boolean }): void {
     } catch (error) {
       if (useProgramStore.getState().version !== version) return
       const message = error instanceof Error ? error.message : String(error)
-      useProgramStore.getState().setError([
-        { nodeId: error instanceof CompileError ? error.nodeId : undefined, message },
-      ])
+      useProgramStore
+        .getState()
+        .setError([{ nodeId: error instanceof CompileError ? error.nodeId : undefined, message }])
     }
   }
 

@@ -19,10 +19,11 @@ const check = (name, ok, detail) => {
 
 /** 通过开发调试接口设置视口，等价于用户平移 + 缩放到指定状态 */
 const setView = async (scale, x, y) => {
-  await page.evaluate(
-    ({ scale, x, y }) => window.__graphDebug.setView(scale, x, y),
-    { scale, x, y },
-  )
+  await page.evaluate(({ scale, x, y }) => window.__graphDebug.setView(scale, x, y), {
+    scale,
+    x,
+    y,
+  })
   // 等 rAF 把视口写进 store 并完成一次 commit
   await page.waitForTimeout(150)
 }
@@ -77,14 +78,24 @@ try {
     await setView(view.scale, view.x, view.y)
 
     const alignment = await measure()
-    check(`${view.label} 平移缩放后端口偏差 < 2px`, alignment.port < TOLERANCE, `${alignment.port}px`)
-    check(`${view.label} 平移缩放后节点框偏差 < 2px`, alignment.box < TOLERANCE, `${alignment.box}px`)
+    check(
+      `${view.label} 平移缩放后端口偏差 < 2px`,
+      alignment.port < TOLERANCE,
+      `${alignment.port}px`,
+    )
+    check(
+      `${view.label} 平移缩放后节点框偏差 < 2px`,
+      alignment.box < TOLERANCE,
+      `${alignment.box}px`,
+    )
 
     const native = await measureNative()
     check(
       `${view.label} 原生节点绘制已隐藏`,
       native !== null && native.sampled > 0 && native.coverage < NATIVE_LIMIT,
-      native ? `区域差异 ${(native.coverage * 100).toFixed(1)}% / 采样 ${native.sampled} 个节点` : '无法读取像素',
+      native
+        ? `区域差异 ${(native.coverage * 100).toFixed(1)}% / 采样 ${native.sampled} 个节点`
+        : '无法读取像素',
     )
   }
 
@@ -150,7 +161,9 @@ try {
   const phantomAnchor = await page.locator('.graph-node[data-node-id="2"]').boundingBox()
   await page.mouse.move(phantomAnchor.x - 10, phantomAnchor.y - 70)
   await page.mouse.down()
-  await page.mouse.move(phantomAnchor.x + phantomAnchor.width + 10, phantomAnchor.y - 20, { steps: 8 })
+  await page.mouse.move(phantomAnchor.x + phantomAnchor.width + 10, phantomAnchor.y - 20, {
+    steps: 8,
+  })
   await page.mouse.up()
   await page.waitForTimeout(200)
   const phantom = await page.evaluate(() => window.__graphDebug.canvas.selectedItems.size)
@@ -285,7 +298,8 @@ try {
   await page.waitForTimeout(200)
   check(
     '点击选中节点同步高亮',
-    (await page.locator('.graph-node.is-selected').count()) === 1 && (await statusValue('选中')) === 1,
+    (await page.locator('.graph-node.is-selected').count()) === 1 &&
+      (await statusValue('选中')) === 1,
     `${await page.locator('.graph-node.is-selected').count()} 个高亮 / 选中 ${await statusValue('选中')}`,
   )
 
@@ -361,16 +375,22 @@ try {
 
   // 拖动右下角缩放：DOM 尺寸与输出端口必须在拖动过程中实时跟随
   const resizeBox = await page.locator('.graph-node[data-node-id="1"]').boundingBox()
-  const sizeBeforeResize = await page.evaluate(() => [...window.__graphDebug.graph.getNodeById(1).size])
+  const sizeBeforeResize = await page.evaluate(() => [
+    ...window.__graphDebug.graph.getNodeById(1).size,
+  ])
   await page.mouse.move(resizeBox.x + resizeBox.width - 2, resizeBox.y + resizeBox.height - 2)
   await page.mouse.down()
-  await page.mouse.move(resizeBox.x + resizeBox.width + 60, resizeBox.y + resizeBox.height + 40, { steps: 10 })
+  await page.mouse.move(resizeBox.x + resizeBox.width + 60, resizeBox.y + resizeBox.height + 40, {
+    steps: 10,
+  })
   await page.waitForTimeout(120)
   const liveResize = await page.evaluate(() => {
     const api = window.__graphDebug
     const node = api.graph.getNodeById(1)
     const el = document.querySelector('.graph-node[data-node-id="1"]')
-    const port = document.querySelector('.graph-port[data-node-id="1"][data-direction="out"][data-port-index="0"]')
+    const port = document.querySelector(
+      '.graph-port[data-node-id="1"][data-direction="out"][data-port-index="0"]',
+    )
     const canvasRect = api.canvas.canvas.getBoundingClientRect()
     const portRect = port.getBoundingClientRect()
     const [px] = api.canvas.ds.convertOffsetToCanvas([node.getOutputPos(0)[0], 0])
@@ -389,7 +409,11 @@ try {
       liveResize.nodeSize[0] > sizeBeforeResize[0] + 40,
     `图 ${liveResize.nodeSize.join('×')} / DOM ${liveResize.domSize.join('×')}`,
   )
-  check('缩放节点时输出端口跟随', liveResize.portDelta < TOLERANCE, `${liveResize.portDelta.toFixed(2)}px`)
+  check(
+    '缩放节点时输出端口跟随',
+    liveResize.portDelta < TOLERANCE,
+    `${liveResize.portDelta.toFixed(2)}px`,
+  )
   const afterResize = await measure()
   check(
     '缩放后端口与节点框偏差 < 2px',
@@ -405,7 +429,10 @@ try {
   const anchorPoint = await page.evaluate(([x, y]) => {
     const api = window.__graphDebug
     const rect = api.canvas.canvas.getBoundingClientRect()
-    return { scale: api.canvas.ds.scale, point: api.canvas.ds.convertCanvasToOffset([x - rect.left, y - rect.top]) }
+    return {
+      scale: api.canvas.ds.scale,
+      point: api.canvas.ds.convertCanvasToOffset([x - rect.left, y - rect.top]),
+    }
   }, anchor)
   await page.mouse.move(anchor[0], anchor[1])
   await page.mouse.wheel(0, -240)
@@ -413,9 +440,15 @@ try {
   const afterWheel = await page.evaluate(([x, y]) => {
     const api = window.__graphDebug
     const rect = api.canvas.canvas.getBoundingClientRect()
-    return { scale: api.canvas.ds.scale, point: api.canvas.ds.convertCanvasToOffset([x - rect.left, y - rect.top]) }
+    return {
+      scale: api.canvas.ds.scale,
+      point: api.canvas.ds.convertCanvasToOffset([x - rect.left, y - rect.top]),
+    }
   }, anchor)
-  const anchorDrift = Math.hypot(afterWheel.point[0] - anchorPoint.point[0], afterWheel.point[1] - anchorPoint.point[1])
+  const anchorDrift = Math.hypot(
+    afterWheel.point[0] - anchorPoint.point[0],
+    afterWheel.point[1] - anchorPoint.point[1],
+  )
   check(
     'Widget 上滚轮以光标为锚点缩放',
     afterWheel.scale > anchorPoint.scale + 0.1 && anchorDrift < TOLERANCE,
@@ -434,7 +467,9 @@ try {
     .boundingBox()
   await page.mouse.move(geoOut.x + geoOut.width / 2, geoOut.y + geoOut.height / 2)
   await page.mouse.down()
-  await page.mouse.move(materialIn.x + materialIn.width / 2, materialIn.y + materialIn.height / 2, { steps: 15 })
+  await page.mouse.move(materialIn.x + materialIn.width / 2, materialIn.y + materialIn.height / 2, {
+    steps: 15,
+  })
   await page.mouse.up()
   await page.waitForTimeout(250)
   const invalidLinks = await page.evaluate(() => window.__graphDebug.graph.links.size)
@@ -448,7 +483,9 @@ try {
   check('端口按类型着色', geoColor === 'rgb(29, 158, 117)', geoColor)
 
   // ⑩ Widget 双向绑定：修改 shader/Float 的 value，写回 LiteGraph widget
-  const valueInput = page.locator('.graph-node[data-node-id="5"] .graph-widget[data-widget-name="value"] input')
+  const valueInput = page.locator(
+    '.graph-node[data-node-id="5"] .graph-widget[data-widget-name="value"] input',
+  )
   await valueInput.fill('30')
   await page.waitForTimeout(200)
   const valueWritten = await page.evaluate(() => {
@@ -457,7 +494,11 @@ try {
     return widget ? widget.value : null
   })
   const valueShown = await valueInput.inputValue()
-  check('Widget 修改写回图数据', Number(valueWritten) === 30 && valueShown === '30', `图值 ${valueWritten} / 控件 ${valueShown}`)
+  check(
+    'Widget 修改写回图数据',
+    Number(valueWritten) === 30 && valueShown === '30',
+    `图值 ${valueWritten} / 控件 ${valueShown}`,
+  )
 
   // ⑪ 节点库：搜索过滤 + 点击添加
   const libraryItemCount = async () => page.locator('.node-library-item').count()
@@ -489,7 +530,8 @@ try {
   await page.waitForTimeout(200)
   const dragDuring = await page.evaluate(() => ({
     count: window.__graphDebug.graph.nodes.length,
-    highlight: document.querySelector('.graph-canvas')?.classList.contains('is-drop-target') ?? false,
+    highlight:
+      document.querySelector('.graph-canvas')?.classList.contains('is-drop-target') ?? false,
   }))
   await page.mouse.up()
   await page.waitForTimeout(300)
@@ -546,12 +588,16 @@ try {
     .first()
     .boundingBox()
   const floatIn = await page
-    .locator('.graph-port[data-node-id="4"][data-direction="in"][data-port-type="FLOAT"][data-port-index="1"]')
+    .locator(
+      '.graph-port[data-node-id="4"][data-direction="in"][data-port-type="FLOAT"][data-port-index="1"]',
+    )
     .first()
     .boundingBox()
   await page.mouse.move(floatOut.x + floatOut.width / 2, floatOut.y + floatOut.height / 2)
   await page.mouse.down()
-  await page.mouse.move(floatIn.x + floatIn.width / 2, floatIn.y + floatIn.height / 2, { steps: 15 })
+  await page.mouse.move(floatIn.x + floatIn.width / 2, floatIn.y + floatIn.height / 2, {
+    steps: 15,
+  })
   await page.mouse.up()
   await page.waitForTimeout(250)
   const validLinks = await page.evaluate(() => window.__graphDebug.graph.links.size)
@@ -587,12 +633,16 @@ try {
   const nodesAfterRedo = await page.evaluate(() => window.__graphDebug.graph.nodes.length)
   check(
     '撤销/重做恢复节点增删',
-    nodesAfterAdd === nodesBeforeAdd + 1 && nodesAfterUndo === nodesBeforeAdd && nodesAfterRedo === nodesAfterAdd,
+    nodesAfterAdd === nodesBeforeAdd + 1 &&
+      nodesAfterUndo === nodesBeforeAdd &&
+      nodesAfterRedo === nodesAfterAdd,
     `${nodesBeforeAdd} → ${nodesAfterAdd} → ${nodesAfterUndo} → ${nodesAfterRedo}`,
   )
 
   // ⑮ Widget 变更的撤销（连续调参合并为一条）+ Ctrl+Z 快捷键
-  const valueLocator = page.locator('.graph-node[data-node-id="5"] .graph-widget[data-widget-name="value"] input')
+  const valueLocator = page.locator(
+    '.graph-node[data-node-id="5"] .graph-widget[data-widget-name="value"] input',
+  )
   await valueLocator.fill('42')
   await page.waitForTimeout(200)
   await page.evaluate(() => window.__graphDebug.undo())
@@ -613,7 +663,11 @@ try {
   await page.waitForTimeout(150)
   await page.keyboard.press('Control+z')
   await page.waitForTimeout(300)
-  check('Ctrl+Z 快捷键撤销', (await valueLocator.inputValue()) === '30', `value=${await valueLocator.inputValue()}`)
+  check(
+    'Ctrl+Z 快捷键撤销',
+    (await valueLocator.inputValue()) === '30',
+    `value=${await valueLocator.inputValue()}`,
+  )
   await page.evaluate(() => window.__graphDebug.redo())
   await page.waitForTimeout(200)
 
@@ -660,7 +714,9 @@ try {
   })
   check(
     '非法导入被拒绝且图不变',
-    invalidImport.ok === false && invalidImport.level === 1 && invalidImport.before === invalidImport.after,
+    invalidImport.ok === false &&
+      invalidImport.level === 1 &&
+      invalidImport.before === invalidImport.after,
     `level ${invalidImport.level} / 节点 ${invalidImport.before} → ${invalidImport.after}`,
   )
 
@@ -804,7 +860,10 @@ try {
       const scale = Math.min(200 / (maxX - minX), 130 / (maxY - minY))
       const offsetX = (200 - (maxX - minX) * scale) / 2
       const offsetY = (130 - (maxY - minY) * scale) / 2
-      return [minX + (clientX - map.left - 1 - offsetX) / scale, minY + (clientY - map.top - 1 - offsetY) / scale]
+      return [
+        minX + (clientX - map.left - 1 - offsetX) / scale,
+        minY + (clientY - map.top - 1 - offsetY) / scale,
+      ]
     },
     [miniClickX, miniClickY],
   )
@@ -830,21 +889,22 @@ try {
     }
   })
   const clickBorder = [miniClickX - miniBox.x, miniClickY - miniBox.y]
-  const centerDelta = Math.hypot(miniAfter.center[0] - miniTarget[0], miniAfter.center[1] - miniTarget[1])
+  const centerDelta = Math.hypot(
+    miniAfter.center[0] - miniTarget[0],
+    miniAfter.center[1] - miniTarget[1],
+  )
   const markerDelta = Math.hypot(
     miniAfter.viewportCenter[0] - clickBorder[0],
     miniAfter.viewportCenter[1] - clickBorder[1],
   )
   check(
     '迷你地图展示并可导航',
-    miniBefore.exists && miniBefore.nodes === miniBefore.graphNodes && miniAfter.offset.some((value) => value !== 0),
+    miniBefore.exists &&
+      miniBefore.nodes === miniBefore.graphNodes &&
+      miniAfter.offset.some((value) => value !== 0),
     `${miniBefore.nodes} 个节点`,
   )
-  check(
-    '点击迷你地图后目标点居中 < 2px',
-    centerDelta < 2,
-    `偏差 ${centerDelta.toFixed(2)}px`,
-  )
+  check('点击迷你地图后目标点居中 < 2px', centerDelta < 2, `偏差 ${centerDelta.toFixed(2)}px`)
   check(
     '迷你地图投影不随视口漂移',
     JSON.stringify(miniAfter.rects) === JSON.stringify(miniBefore.rects) && markerDelta < 2,
@@ -856,7 +916,10 @@ try {
   await page.mouse.click(miniClickX, miniClickY)
   await page.waitForTimeout(300)
   const miniRepeat = await page.evaluate(() => [...window.__graphDebug.canvas.ds.offset])
-  const repeatDelta = Math.hypot(miniRepeat[0] - offsetAfterFirst[0], miniRepeat[1] - offsetAfterFirst[1])
+  const repeatDelta = Math.hypot(
+    miniRepeat[0] - offsetAfterFirst[0],
+    miniRepeat[1] - offsetAfterFirst[1],
+  )
   check('重复点击同一位置不漂移', repeatDelta < 0.5, `Δ ${repeatDelta.toFixed(2)}px`)
   await setView(1, 0, 0)
 

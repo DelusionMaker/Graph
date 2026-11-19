@@ -56,11 +56,22 @@ export function measurePorts(graph: LGraph, canvas: LGraphCanvas): PortMeasureme
       const rect = el.getBoundingClientRect()
       const dx = Math.abs(expectedX - (rect.left + rect.width / 2))
       const dy = Math.abs(expectedY - (rect.top + rect.height / 2))
-      results.push({ nodeId: Number(node.id), port: name, direction, dx, dy, dist: Math.hypot(dx, dy) })
+      results.push({
+        nodeId: Number(node.id),
+        port: name,
+        direction,
+        dx,
+        dy,
+        dist: Math.hypot(dx, dy),
+      })
     }
 
-    node.inputs?.forEach((slot, index) => check(slot.name ?? `in${index}`, index, node.getInputPos(index) as Tuple, 'in'))
-    node.outputs?.forEach((slot, index) => check(slot.name ?? `out${index}`, index, node.getOutputPos(index) as Tuple, 'out'))
+    node.inputs?.forEach((slot, index) =>
+      check(slot.name ?? `in${index}`, index, node.getInputPos(index) as Tuple, 'in'),
+    )
+    node.outputs?.forEach((slot, index) =>
+      check(slot.name ?? `out${index}`, index, node.getOutputPos(index) as Tuple, 'out'),
+    )
   }
   return results
 }
@@ -89,7 +100,10 @@ export function measureNodeBoxes(graph: LGraph, canvas: LGraphCanvas): BoxMeasur
  * 记录节点主体区域像素 → 把节点临时移出画布重绘 → 比较两帧差异 → 移回。
  * 原生绘制被隐藏时差异接近 0；若原生绘制仍在，节点填充色会大面积覆盖该区域。
  */
-export function measureNativeDrawing(graph: LGraph, canvas: LGraphCanvas): NativeMeasurement | null {
+export function measureNativeDrawing(
+  graph: LGraph,
+  canvas: LGraphCanvas,
+): NativeMeasurement | null {
   const el = canvas.canvas
   const ctx = el.getContext('2d')
   if (!ctx) return null
@@ -124,7 +138,11 @@ export function measureNativeDrawing(graph: LGraph, canvas: LGraphCanvas): Nativ
 
       let diff = 0
       for (let i = 0; i < before.length; i += 4) {
-        if (before[i] !== after[i] || before[i + 1] !== after[i + 1] || before[i + 2] !== after[i + 2]) {
+        if (
+          before[i] !== after[i] ||
+          before[i + 1] !== after[i + 1] ||
+          before[i + 2] !== after[i + 2]
+        ) {
           diff++
         }
       }

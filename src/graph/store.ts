@@ -1,5 +1,11 @@
 import { create } from 'zustand'
-import type { LinkSnapshot, NodeGeometryUpdate, NodeSnapshot, SelectionRect, Viewport } from './types'
+import type {
+  LinkSnapshot,
+  NodeGeometryUpdate,
+  NodeSnapshot,
+  SelectionRect,
+  Viewport,
+} from './types'
 
 interface GraphState {
   /** LiteGraph 的渲染镜像，唯一真相源仍是 LGraph */

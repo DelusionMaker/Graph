@@ -5,10 +5,7 @@ import type { WebGLRenderer } from 'three'
  * - lost：必须 preventDefault，否则浏览器不会尝试恢复；
  * - restored：触发重编译并请求一帧，材质与 Composer 由 three/R3F 重建。
  */
-export function installContextLossHandling(
-  gl: WebGLRenderer,
-  onRestored: () => void,
-): () => void {
+export function installContextLossHandling(gl: WebGLRenderer, onRestored: () => void): () => void {
   const canvas = gl.domElement
 
   const handleLost = (event: Event) => {

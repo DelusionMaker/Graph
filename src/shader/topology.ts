@@ -20,7 +20,11 @@ export function buildIncomingIndex(links: UILink[]): Map<number, UILink[]> {
  * 从终端节点逆着输入连线收集可达节点（含终端自身）。
  * 用于把与终端无关的节点排除在编译之外。
  */
-export function getReachableNodes(nodes: UINode[], links: UILink[], terminalId: number): Set<number> {
+export function getReachableNodes(
+  nodes: UINode[],
+  links: UILink[],
+  terminalId: number,
+): Set<number> {
   const known = new Set(nodes.map((node) => node.id))
   const reached = new Set<number>()
   if (!known.has(terminalId)) return reached

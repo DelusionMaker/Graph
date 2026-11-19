@@ -38,7 +38,10 @@ const dragPort = async (fromSelector, toSelector) => {
 }
 
 const graphState = () =>
-  page.evaluate(() => ({ nodes: window.__graphDebug.graph.nodes.length, links: window.__graphDebug.graph.links.size }))
+  page.evaluate(() => ({
+    nodes: window.__graphDebug.graph.nodes.length,
+    links: window.__graphDebug.graph.links.size,
+  }))
 
 // ① 3D 示例：载入后 11 节点 8 连线，编译产物就绪
 await page.getByRole('button', { name: '载入 3D 示例' }).click()
@@ -54,7 +57,11 @@ const sample = await page.evaluate(() => {
     postfx: state.postfx,
   }
 })
-check('3D 示例 11 节点 / 9 连线', sample.nodes === 11 && sample.links === 9, `${sample.nodes} / ${sample.links}`)
+check(
+  '3D 示例 11 节点 / 9 连线',
+  sample.nodes === 11 && sample.links === 9,
+  `${sample.nodes} / ${sample.links}`,
+)
 check(
   '3D 示例编译产物就绪',
   sample.shading === 'pbr' && sample.lights === 2 && sample.postfx.length === 1,
@@ -103,7 +110,9 @@ await dragPort(
 )
 const invalid = await page.evaluate(() => ({
   links: window.__graphDebug.graph.links.size,
-  toasts: [...document.querySelectorAll('.toast')].map((element) => element.textContent).join(' | '),
+  toasts: [...document.querySelectorAll('.toast')]
+    .map((element) => element.textContent)
+    .join(' | '),
 }))
 check('非法类型连接被拦截', invalid.links === 9, `${invalid.links} 条`)
 check('非法连接给出提示', /类型不匹配/.test(invalid.toasts), invalid.toasts)
@@ -142,7 +151,9 @@ await dragPort(
 )
 const cycle = await page.evaluate(() => ({
   links: window.__graphDebug.graph.links.size,
-  toasts: [...document.querySelectorAll('.toast')].map((element) => element.textContent).join(' | '),
+  toasts: [...document.querySelectorAll('.toast')]
+    .map((element) => element.textContent)
+    .join(' | '),
 }))
 check('同类连线可建立（环路前置）', forwardLinks === 1, `${forwardLinks} 条`)
 check('环路被拦截', cycle.links === 1, `${cycle.links} 条`)
@@ -208,7 +219,11 @@ const undoCount = (await graphState()).nodes
 await page.evaluate(() => window.__graphDebug.redo())
 await page.waitForTimeout(300)
 const redoCount = (await graphState()).nodes
-check('撤销/重做恢复 100 节点导入', undoCount === 2 && redoCount === 100, `${undoCount} → ${redoCount}`)
+check(
+  '撤销/重做恢复 100 节点导入',
+  undoCount === 2 && redoCount === 100,
+  `${undoCount} → ${redoCount}`,
+)
 
 await page.evaluate((workflow) => window.__graphDebug.importWorkflow(workflow), originalWorkflow)
 await page.evaluate(() => window.__graphDebug.setView(1, 0, 0))
@@ -230,7 +245,11 @@ const resilient = await page.evaluate(() => {
     proto.setItem = original
   }
 })
-check('localStorage 写入失败不崩溃', resilient && pageErrors.length === 0, `${pageErrors.length} 个页面异常`)
+check(
+  'localStorage 写入失败不崩溃',
+  resilient && pageErrors.length === 0,
+  `${pageErrors.length} 个页面异常`,
+)
 
 // ⑧ 保存后刷新恢复（独立上下文，避免与主流程互相影响）
 const persistContext = await browser.newContext({ viewport: { width: 1440, height: 900 } })
@@ -283,9 +302,17 @@ for (const width of [1280, 1920]) {
 const sampleFile = JSON.parse(readFileSync('examples/shader-demo.workflow.json', 'utf8'))
 const fileImport = await page.evaluate((workflow) => {
   const result = window.__graphDebug.importWorkflow(workflow)
-  return { ok: result.ok, nodes: window.__graphDebug.graph.nodes.length, links: window.__graphDebug.graph.links.size }
+  return {
+    ok: result.ok,
+    nodes: window.__graphDebug.graph.nodes.length,
+    links: window.__graphDebug.graph.links.size,
+  }
 }, sampleFile)
-check('示例 JSON 可导入', fileImport.ok && fileImport.nodes === 11 && fileImport.links === 9, `${fileImport.nodes} / ${fileImport.links}`)
+check(
+  '示例 JSON 可导入',
+  fileImport.ok && fileImport.nodes === 11 && fileImport.links === 9,
+  `${fileImport.nodes} / ${fileImport.links}`,
+)
 
 check('无页面异常', pageErrors.length === 0, `${pageErrors.length} 个`)
 

@@ -24,11 +24,7 @@ function fallbackFloat(ctx: EmitContext, name: string, fallback: number): string
   })
 }
 
-function fallbackColor(
-  ctx: EmitContext,
-  name: string,
-  fallback: [number, number, number],
-): string {
+function fallbackColor(ctx: EmitContext, name: string, fallback: [number, number, number]): string {
   const value = parseColor(ctx.widget(name), fallback)
   return ctx.uniform(name, 'color', value, {
     nodeId: ctx.nodeId,

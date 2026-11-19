@@ -67,7 +67,13 @@ export function registerNodeDefinitions(): void {
         ) => unknown
 
         for (const widget of definition.widgets) {
-          addWidget(WIDGET_LIB_TYPES[widget.kind], widget.name, widget.value, () => {}, widgetOptions(widget))
+          addWidget(
+            WIDGET_LIB_TYPES[widget.kind],
+            widget.name,
+            widget.value,
+            () => {},
+            widgetOptions(widget),
+          )
         }
 
         this.setSize(nodeSize(definition))

@@ -49,10 +49,15 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     inputs: [],
     outputs: [{ name: 'geometry', type: 'GEOMETRY' }],
     widgets: [
-      { name: 'shape', kind: 'combo', value: 'box', values: ['box', 'sphere', 'torusknot', 'gltf'] },
+      {
+        name: 'shape',
+        kind: 'combo',
+        value: 'box',
+        values: ['box', 'sphere', 'torusknot', 'gltf'],
+      },
       { name: 'assetId', kind: 'text', value: '' },
       { name: 'scale', kind: 'number', value: 1, min: 0.1, max: 10, step: 0.1 },
-      { name: 'wireframe', kind: 'boolean', value: false }
+      { name: 'wireframe', kind: 'boolean', value: false },
     ],
     codeAffectingWidgets: ['shape', 'assetId'],
     width: 220,
@@ -66,7 +71,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       { name: 'geometry', type: 'GEOMETRY' },
       { name: 'material', type: 'MATERIAL' },
       { name: 'lights', type: 'LIGHTS' },
-      { name: 'shadow', type: 'SHADOW'}
+      { name: 'shadow', type: 'SHADOW' },
     ],
     outputs: [],
     widgets: [],
@@ -258,7 +263,12 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     ],
     outputs: [{ name: 'result', type: 'FLOAT' }],
     widgets: [
-      { name: 'op', kind: 'combo', value: 'mul', values: ['add', 'sub', 'mul', 'div', 'sin', 'pow', 'lerp'] },
+      {
+        name: 'op',
+        kind: 'combo',
+        value: 'mul',
+        values: ['add', 'sub', 'mul', 'div', 'sin', 'pow', 'lerp'],
+      },
     ],
     codeAffectingWidgets: ['op'],
     width: 170,
@@ -361,14 +371,19 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
   },
 ]
 
-const definitionsByType = new Map(NODE_DEFINITIONS.map((definition) => [definition.type, definition]))
+const definitionsByType = new Map(
+  NODE_DEFINITIONS.map((definition) => [definition.type, definition]),
+)
 
 export function getNodeDefinition(type: string): NodeDefinition | undefined {
   return definitionsByType.get(type)
 }
 
 /** 读取节点某个 widget 的值；widget 顺序与定义一致 */
-export function readWidgetValue(node: { type: string; widgets_values: unknown[] }, name: string): unknown {
+export function readWidgetValue(
+  node: { type: string; widgets_values: unknown[] },
+  name: string,
+): unknown {
   const definition = getNodeDefinition(node.type)
   const index = definition?.widgets.findIndex((widget) => widget.name === name) ?? -1
   if (index < 0) return undefined
@@ -376,7 +391,9 @@ export function readWidgetValue(node: { type: string; widgets_values: unknown[] 
 }
 
 /** 节点库用：按分类分组并支持关键字过滤 */
-export function searchNodeDefinitions(query: string): { category: string; nodes: NodeDefinition[] }[] {
+export function searchNodeDefinitions(
+  query: string,
+): { category: string; nodes: NodeDefinition[] }[] {
   const keyword = query.trim().toLowerCase()
   const groups = new Map<string, NodeDefinition[]>()
 

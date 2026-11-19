@@ -55,10 +55,7 @@ function renderEffect(item: PostFXDescriptor): ReactElement | null {
  */
 export function PostFXStack() {
   const chain = useProgramStore((state) => state.program?.postfxChain ?? EMPTY)
-  const chainHash = useMemo(
-    () => chain.map((item) => `${item.id}:${item.type}`).join('|'),
-    [chain],
-  )
+  const chainHash = useMemo(() => chain.map((item) => `${item.id}:${item.type}`).join('|'), [chain])
 
   if (chain.length === 0) return null
 

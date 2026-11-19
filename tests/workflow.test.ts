@@ -7,7 +7,9 @@ describe('parseWorkflow 三级校验', () => {
     expect(parseWorkflow([]).issues[0].level).toBe(1)
     expect(parseWorkflow({ nodes: [], links: [] }).workflow).not.toBeNull()
     expect(parseWorkflow({ nodes: [] }).issues[0].level).toBe(1)
-    expect(parseWorkflow({ nodes: [], links: [], config: { schema_version: 99 } }).workflow).toBeNull()
+    expect(
+      parseWorkflow({ nodes: [], links: [], config: { schema_version: 99 } }).workflow,
+    ).toBeNull()
   })
 
   it('丢弃重复 id 的节点并记录二级问题', () => {

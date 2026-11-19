@@ -71,7 +71,10 @@ export const NodeView = memo(function NodeView({ node, selected, hasError = fals
               }}
               title={`${port.name} (${port.type})`}
             />
-            <span className="graph-port-label is-output" style={{ right: node.size[0] - cx + 12, top: cy - 9 }}>
+            <span
+              className="graph-port-label is-output"
+              style={{ right: node.size[0] - cx + 12, top: cy - 9 }}
+            >
               {port.name}
             </span>
           </div>

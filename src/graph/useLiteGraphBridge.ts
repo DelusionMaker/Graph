@@ -2,7 +2,11 @@ import { useEffect, useState, type RefObject } from 'react'
 import { LGraph, LGraphCanvas, LGraphNode, LiteGraph, type LLink } from '@comfyorg/litegraph'
 import '@comfyorg/litegraph/style.css'
 import { resetGraphActions, useGraphActions } from './actions'
-import { beginConnectionGesture, clearConnectionError, endConnectionGesture } from './connectionFeedback'
+import {
+  beginConnectionGesture,
+  clearConnectionError,
+  endConnectionGesture,
+} from './connectionFeedback'
 import { canvasPointToGraph, centerOffset, readViewport } from './coords'
 import { SnapshotHistory } from './history'
 import { getNodeDefinition, registerNodeDefinitions } from './nodeRegistry'
@@ -427,7 +431,8 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
       commit()
       // 只有"点击"才切换连线选中，避免拖拽结束时误选脚下的连线
       const isClick =
-        pointerDownButton === 0 && Math.hypot(event.clientX - pointerDownX, event.clientY - pointerDownY) < 4
+        pointerDownButton === 0 &&
+        Math.hypot(event.clientX - pointerDownX, event.clientY - pointerDownY) < 4
       if (!isClick) return
       const link = findLinkAt(event.clientX, event.clientY)
       if (link) {
@@ -440,7 +445,12 @@ export function useLiteGraphBridge(canvasRef: RefObject<HTMLCanvasElement>): Gra
     const isEditableTarget = (target: EventTarget | null) => {
       const el = target as HTMLElement | null
       if (!el) return false
-      return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable
+      return (
+        el.tagName === 'INPUT' ||
+        el.tagName === 'TEXTAREA' ||
+        el.tagName === 'SELECT' ||
+        el.isContentEditable
+      )
     }
 
     const onKeyDown = (event: KeyboardEvent) => {

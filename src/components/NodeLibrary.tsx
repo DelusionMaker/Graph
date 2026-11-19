@@ -51,7 +51,13 @@ function getDragGhost(): HTMLDivElement {
   return dragGhost
 }
 
-function LibraryItem({ definition, onAdd }: { definition: NodeDefinition; onAdd: (type: string) => void }) {
+function LibraryItem({
+  definition,
+  onAdd,
+}: {
+  definition: NodeDefinition
+  onAdd: (type: string) => void
+}) {
   return (
     <button
       type="button"

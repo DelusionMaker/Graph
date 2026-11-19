@@ -48,7 +48,8 @@ export const useViewerStore = create<ViewerState>((set) => ({
   dockOpen: false,
   setCamera: (camera) => set({ camera }),
   setShape: (shape) => set({ shape }),
-  setGltf: (gltfUrl, gltfName = null) => set({ gltfUrl, gltfName, shape: gltfUrl ? 'gltf' : 'box' }),
+  setGltf: (gltfUrl, gltfName = null) =>
+    set({ gltfUrl, gltfName, shape: gltfUrl ? 'gltf' : 'box' }),
   setModelScale: (modelScale) => set({ modelScale }),
   setWireframe: (wireframe) => set({ wireframe }),
   setFrameloop: (frameloop) => set({ frameloop }),

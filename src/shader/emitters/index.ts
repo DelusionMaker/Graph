@@ -51,12 +51,7 @@ export interface EmitContext {
   /** 注册 uniform 并追加声明，返回变量名 */
   uniform: (suffix: string, kind: UniformKind, value: unknown, source: UniformSource) => string
   /** 注册纹理 uniform，返回变量名 */
-  texture: (
-    suffix: string,
-    assetId: string,
-    wrap: TextureSlot['wrap'],
-    flipY: boolean,
-  ) => string
+  texture: (suffix: string, assetId: string, wrap: TextureSlot['wrap'], flipY: boolean) => string
   /** 追加任意 GLSL 声明 */
   declare: (glsl: string) => void
   /** 记录警告（不阻断编译） */

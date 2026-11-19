@@ -28,7 +28,10 @@ export interface GraphActions {
 }
 
 const noop = () => {}
-const failedImport = (): ImportResult => ({ ok: false, issues: [{ level: 1, message: '图尚未初始化' }] })
+const failedImport = (): ImportResult => ({
+  ok: false,
+  issues: [{ level: 1, message: '图尚未初始化' }],
+})
 
 export const defaultGraphActions: GraphActions = {
   addNode: noop,

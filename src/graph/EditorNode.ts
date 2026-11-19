@@ -58,7 +58,8 @@ export class EditorNode extends LGraphNode {
   ): boolean {
     const graph = this.graph
     if (!graph) return true
-    const target = typeof targetNode === 'number' ? graph.getNodeById(targetNode) : (targetNode as LGraphNode)
+    const target =
+      typeof targetNode === 'number' ? graph.getNodeById(targetNode) : (targetNode as LGraphNode)
     if (!target) return true
     if (target === this || canReach(target, this)) {
       reportConnectionError('不能连接：会形成循环依赖')

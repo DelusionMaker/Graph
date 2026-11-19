@@ -17,7 +17,8 @@ export function InspectorPanel() {
   const nodes = useGraphStore((state) => state.nodes)
   const selectedIds = useGraphStore((state) => state.selectedIds)
   const errors = useProgramStore((state) => state.errors)
-  const node = selectedIds.length === 1 ? nodes.find((item) => item.id === selectedIds[0]) : undefined
+  const node =
+    selectedIds.length === 1 ? nodes.find((item) => item.id === selectedIds[0]) : undefined
 
   if (!node) return <SceneOverview />
 
@@ -37,8 +38,12 @@ export function InspectorPanel() {
       <section>
         <h3>布局</h3>
         <ul className="stats">
-          <li>位置：{Math.round(node.pos[0])}, {Math.round(node.pos[1])}</li>
-          <li>尺寸：{Math.round(node.size[0])} × {Math.round(node.size[1])}</li>
+          <li>
+            位置：{Math.round(node.pos[0])}, {Math.round(node.pos[1])}
+          </li>
+          <li>
+            尺寸：{Math.round(node.size[0])} × {Math.round(node.size[1])}
+          </li>
         </ul>
       </section>
 
@@ -49,7 +54,11 @@ export function InspectorPanel() {
         ) : (
           node.inputs.map((port) => (
             <div key={`in-${port.index}`} className="inspector-port">
-              <span className="inspector-dot" style={{ background: portColor(port.type) }} aria-hidden="true" />
+              <span
+                className="inspector-dot"
+                style={{ background: portColor(port.type) }}
+                aria-hidden="true"
+              />
               <span className="inspector-port-name">{port.name}</span>
               <span className="inspector-port-type">{port.type}</span>
             </div>
@@ -64,7 +73,11 @@ export function InspectorPanel() {
         ) : (
           node.outputs.map((port) => (
             <div key={`out-${port.index}`} className="inspector-port">
-              <span className="inspector-dot" style={{ background: portColor(port.type) }} aria-hidden="true" />
+              <span
+                className="inspector-dot"
+                style={{ background: portColor(port.type) }}
+                aria-hidden="true"
+              />
               <span className="inspector-port-name">{port.name}</span>
               <span className="inspector-port-type">{port.type}</span>
             </div>

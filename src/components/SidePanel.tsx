@@ -33,7 +33,9 @@ export function SidePanel({ context }: { context: GraphContext | null }) {
           </button>
         )}
       </div>
-      <div className="side-body">{tab === 'dev' && context ? <DevPanel context={context} /> : <InspectorPanel />}</div>
+      <div className="side-body">
+        {tab === 'dev' && context ? <DevPanel context={context} /> : <InspectorPanel />}
+      </div>
     </aside>
   )
 }

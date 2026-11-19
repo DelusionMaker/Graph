@@ -37,26 +37,46 @@ export function DevPanel({ context }: Props) {
 
       <section>
         <h3>几何对齐</h3>
-        <p>比较 LiteGraph 的端口/节点坐标投影与 React DOM 的实际屏幕位置。缩放与平移后重新测量，均应 &lt; {TOLERANCE}px。</p>
+        <p>
+          比较 LiteGraph 的端口/节点坐标投影与 React DOM 的实际屏幕位置。缩放与平移后重新测量，均应
+          &lt; {TOLERANCE}px。
+        </p>
         <button type="button" onClick={measure}>
           测量几何
         </button>
         {portMax !== null && (
-          <p className={portMax < TOLERANCE ? 'pass' : 'fail'}>端口最大偏差 {portMax.toFixed(2)} px</p>
+          <p className={portMax < TOLERANCE ? 'pass' : 'fail'}>
+            端口最大偏差 {portMax.toFixed(2)} px
+          </p>
         )}
         {boxMax !== null && (
-          <p className={boxMax < TOLERANCE ? 'pass' : 'fail'}>节点框最大偏差 {boxMax.toFixed(2)} px</p>
+          <p className={boxMax < TOLERANCE ? 'pass' : 'fail'}>
+            节点框最大偏差 {boxMax.toFixed(2)} px
+          </p>
         )}
       </section>
 
       <section>
         <h3>原生绘制检测</h3>
-        <p>对比"节点在画布内"与"节点临时移出画布"两帧的像素差异，接近 0 说明节点只由 React 渲染。</p>
-        <button type="button" onClick={() => setNative(measureNativeDrawing(context.graph, context.canvas))}>
+        <p>
+          对比"节点在画布内"与"节点临时移出画布"两帧的像素差异，接近 0 说明节点只由 React 渲染。
+        </p>
+        <button
+          type="button"
+          onClick={() => setNative(measureNativeDrawing(context.graph, context.canvas))}
+        >
           检测原生绘制
         </button>
         {native && (
-          <p className={native.sampled === 0 ? 'pending' : native.coverage < NATIVE_DIFF_LIMIT ? 'pass' : 'fail'}>
+          <p
+            className={
+              native.sampled === 0
+                ? 'pending'
+                : native.coverage < NATIVE_DIFF_LIMIT
+                  ? 'pass'
+                  : 'fail'
+            }
+          >
             {native.sampled === 0
               ? '未采样到完整可见的节点'
               : `区域像素差异 ${(native.coverage * 100).toFixed(1)}%（${native.sampled} 个节点）` +
@@ -72,7 +92,9 @@ export function DevPanel({ context }: Props) {
           <li>连线数：{linkCount}</li>
           <li>选中数：{selectedCount}</li>
           <li>缩放：{viewport.zoom.toFixed(2)}x</li>
-          <li>偏移：{viewport.x.toFixed(0)}, {viewport.y.toFixed(0)}</li>
+          <li>
+            偏移：{viewport.x.toFixed(0)}, {viewport.y.toFixed(0)}
+          </li>
         </ul>
       </section>
     </div>

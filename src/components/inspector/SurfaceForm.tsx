@@ -44,9 +44,7 @@ export function SurfaceForm({ node }: { node: NodeSnapshot }) {
 
           const fallback = node.widgets.find((widget) => widget.name === input.name)
           if (fallback) {
-            return (
-              <Widget key={input.name} nodeId={node.id} widget={fallback} label={label} />
-            )
+            return <Widget key={input.name} nodeId={node.id} widget={fallback} label={label} />
           }
 
           return (

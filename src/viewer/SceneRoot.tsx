@@ -12,10 +12,7 @@ import {
   type Material as ThreeMaterial,
 } from 'three'
 import type { CompiledProgram } from '../shader/compiler'
-import {
-  GROUND_FRAGMENT,
-  GROUND_VERTEX,
-} from '../shader/glsl/chunks'
+import { GROUND_FRAGMENT, GROUND_VERTEX } from '../shader/glsl/chunks'
 import { useProgramStore } from '../shader/useProgramStore'
 import { resolveTexture } from './assets'
 import { ModelAsset } from './ModelAsset'
@@ -209,7 +206,12 @@ export function SceneRoot() {
 
   return (
     <>
-      <ModelAsset shape={mesh.shape} assetId={mesh.assetId} scale={mesh.scale} material={material} />
+      <ModelAsset
+        shape={mesh.shape}
+        assetId={mesh.assetId}
+        scale={mesh.scale}
+        material={material}
+      />
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -1.25, 0]}

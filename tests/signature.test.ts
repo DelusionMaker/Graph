@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 import type { UILink, UINode, WorkflowUI } from '../src/graph/workflow'
 import { computeSignature } from '../src/shader/signature'
 
-function makeNode(id: number, type: string, widgets: unknown[] = [], pos: [number, number] = [0, 0]): UINode {
+function makeNode(
+  id: number,
+  type: string,
+  widgets: unknown[] = [],
+  pos: [number, number] = [0, 0],
+): UINode {
   return {
     id,
     type,

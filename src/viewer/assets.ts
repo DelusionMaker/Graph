@@ -143,7 +143,12 @@ export function disposeObject3D(root: Object3D): void {
 
 function disposeMaterial(material: Material): void {
   for (const value of Object.values(material)) {
-    if (value && typeof value === 'object' && 'isTexture' in value && (value as Texture).isTexture) {
+    if (
+      value &&
+      typeof value === 'object' &&
+      'isTexture' in value &&
+      (value as Texture).isTexture
+    ) {
       ;(value as Texture).dispose()
     }
   }
