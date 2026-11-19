@@ -55,12 +55,12 @@ function useShadowPass(
   const directional = program?.lighting.lights.find((light) => light.type === 'directional')
 
   const target = useMemo(() => {
-    if (!shadow?.enabled || !directional) return null
+    if (!shadow || !directional) return null
     const size = shadow.mapSize
     const renderTarget = new WebGLRenderTarget(size, size)
     renderTarget.depthTexture = new DepthTexture(size, size)
     return renderTarget
-  }, [shadow?.enabled, shadow?.mapSize, Boolean(directional)])
+  }, [shadow !== null, shadow?.mapSize, Boolean(directional)])
 
   useEffect(() => () => target?.dispose(), [target])
 
@@ -70,7 +70,7 @@ function useShadowPass(
     if (!target || !directional) return
     const key = [
       program?.hash,
-      shadow?.enabled,
+      shadow !== null,
       shadow?.mapSize,
       shadow?.bias,
       shadow?.softness,
@@ -87,12 +87,19 @@ function useShadowPass(
     lightCamera.updateMatrixWorld()
     lightCamera.updateProjectionMatrix()
 
-    // 临时把所有投射 mesh 换成深度材质；接收阴影的地面不参与深度 pass
+    // 投射 mesh 临时换成深度材质；接收阴影的地面必须完全移出这次渲染：
+    // 它采样着 target.depthTexture，若留在场景里会造成 framebuffer ↔ texture feedback loop
     const depthMaterial = new MeshDepthMaterial()
     const originals = new Map<Mesh, ThreeMaterial | ThreeMaterial[]>()
+    const hiddenReceivers = new Map<Mesh, boolean>()
     scene.traverse((object) => {
       const mesh = object as Mesh
-      if (!mesh.isMesh || mesh.userData.isShadowReceiver) return
+      if (!mesh.isMesh) return
+      if (mesh.userData.isShadowReceiver) {
+        hiddenReceivers.set(mesh, mesh.visible)
+        mesh.visible = false
+        return
+      }
       originals.set(mesh, mesh.material)
       mesh.material = depthMaterial
     })
@@ -107,6 +114,9 @@ function useShadowPass(
 
     originals.forEach((original, mesh) => {
       mesh.material = original
+    })
+    hiddenReceivers.forEach((visible, mesh) => {
+      mesh.visible = visible
     })
     depthMaterial.dispose()
 
@@ -159,7 +169,7 @@ export function SceneRoot() {
     const shadow = program?.lighting.shadow
     const directional = program?.lighting.lights.find((light) => light.type === 'directional')
     const uniforms = groundMaterial.uniforms
-    uniforms.u_shadowEnabled.value = shadow?.enabled && directional ? 1 : 0
+    uniforms.u_shadowEnabled.value = shadow && directional ? 1 : 0
     uniforms.u_shadowBias.value = shadow?.bias ?? 0.0015
     uniforms.u_shadowTexel.value = 1 / (shadow?.mapSize ?? 1024)
     uniforms.u_shadowSoftness.value = shadow?.softness ?? 1

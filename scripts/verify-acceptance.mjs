@@ -54,7 +54,7 @@ const sample = await page.evaluate(() => {
     postfx: state.postfx,
   }
 })
-check('3D 示例 11 节点 / 8 连线', sample.nodes === 11 && sample.links === 8, `${sample.nodes} / ${sample.links}`)
+check('3D 示例 11 节点 / 9 连线', sample.nodes === 11 && sample.links === 9, `${sample.nodes} / ${sample.links}`)
 check(
   '3D 示例编译产物就绪',
   sample.shading === 'pbr' && sample.lights === 2 && sample.postfx.length === 1,
@@ -74,7 +74,7 @@ await page.waitForTimeout(300)
 const afterRestore = await graphState()
 check(
   '删除节点后撤销恢复',
-  afterDelete.nodes === 10 && afterRestore.nodes === 11 && afterRestore.links === 8,
+  afterDelete.nodes === 10 && afterRestore.nodes === 11 && afterRestore.links === 9,
   `${afterDelete.nodes} → ${afterRestore.nodes}`,
 )
 
@@ -105,7 +105,7 @@ const invalid = await page.evaluate(() => ({
   links: window.__graphDebug.graph.links.size,
   toasts: [...document.querySelectorAll('.toast')].map((element) => element.textContent).join(' | '),
 }))
-check('非法类型连接被拦截', invalid.links === 8, `${invalid.links} 条`)
+check('非法类型连接被拦截', invalid.links === 9, `${invalid.links} 条`)
 check('非法连接给出提示', /类型不匹配/.test(invalid.toasts), invalid.toasts)
 
 // ⑤ 环路拦截：用干净的两个 shader/Math，避免节点重叠遮挡端口
@@ -285,7 +285,7 @@ const fileImport = await page.evaluate((workflow) => {
   const result = window.__graphDebug.importWorkflow(workflow)
   return { ok: result.ok, nodes: window.__graphDebug.graph.nodes.length, links: window.__graphDebug.graph.links.size }
 }, sampleFile)
-check('示例 JSON 可导入', fileImport.ok && fileImport.nodes === 11 && fileImport.links === 8, `${fileImport.nodes} / ${fileImport.links}`)
+check('示例 JSON 可导入', fileImport.ok && fileImport.nodes === 11 && fileImport.links === 9, `${fileImport.nodes} / ${fileImport.links}`)
 
 check('无页面异常', pageErrors.length === 0, `${pageErrors.length} 个`)
 

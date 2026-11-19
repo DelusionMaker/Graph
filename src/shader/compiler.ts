@@ -46,7 +46,7 @@ export interface LightDescriptor {
 }
 
 export interface ShadowSettings {
-  enabled: boolean
+  /** 来自 render/Shadow 节点；非 null 即表示该节点已连接到 Scene Root */
   mapSize: 1024 | 2048
   bias: number
   softness: number
@@ -252,12 +252,23 @@ function readLights(
   return lights.length > 0 ? lights : DEFAULT_LIGHTS
 }
 
-function readShadow(workflow: WorkflowUI): ShadowSettings | null {
-  const node = workflow.nodes.find((item) => item.type === 'render/Shadow')
+/** Scene Root.shadow → render/Shadow；未连接时返回 null（无阴影） */
+function readShadow(
+  root: UINode | null,
+  linkByTarget: Map<string, UILink>,
+  nodeById: Map<number, UINode>,
+  warnings: string[],
+): ShadowSettings | null {
+  if (!root) return null
+
+  const node = findUpstream(root, 'shadow', linkByTarget, nodeById)
   if (!node) return null
+  if (node.type !== 'render/Shadow') {
+    warnings.push(`Scene Root 的 shadow 输入来自 ${node.type}，已忽略`)
+    return null
+  }
 
   return {
-    enabled: readWidgetValue(node, 'enabled') !== false,
     mapSize: Number(readWidgetValue(node, 'mapSize')) === 2048 ? 2048 : 1024,
     bias: readNumber(readWidgetValue(node, 'bias'), 0.0015),
     softness: Math.max(1, Math.min(4, Math.round(readNumber(readWidgetValue(node, 'softness'), 1)))),
@@ -374,7 +385,7 @@ export function compileWorkflow(workflow: WorkflowUI): CompiledProgram {
     textureSlots,
     lighting: {
       lights: readLights(activeRoot, linkByTarget, nodeById, warnings),
-      shadow: readShadow(workflow),
+      shadow: readShadow(activeRoot, linkByTarget, nodeById, warnings),
     },
     postfxChain: collectPostFXChain(workflow, activeOutput?.id ?? null),
     shading,
@@ -432,7 +443,7 @@ export function refreshProgram(workflow: WorkflowUI, previous: CompiledProgram):
     meshFromNode: meshSettings !== null,
     lighting: {
       lights: readLights(root, linkByTarget, nodeById, []),
-      shadow: readShadow(workflow),
+      shadow: readShadow(root, linkByTarget, nodeById, []),
     },
     postfxChain: collectPostFXChain(workflow, previous.activeOutputId),
   }

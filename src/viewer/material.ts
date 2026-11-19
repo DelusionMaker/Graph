@@ -91,7 +91,7 @@ function buildShadowUniforms(program: CompiledProgram): Record<string, IUniform>
     u_shadowBias: { value: shadow?.bias ?? 0.0015 },
     u_shadowTexel: { value: 1 / (shadow?.mapSize ?? 1024) },
     u_shadowSoftness: { value: shadow?.softness ?? 1 },
-    u_shadowEnabled: { value: shadow?.enabled && directional ? 1 : 0 },
+    u_shadowEnabled: { value: shadow && directional ? 1 : 0 },
   }
 }
 

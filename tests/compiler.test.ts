@@ -195,7 +195,7 @@ describe('compileWorkflow', () => {
         makeNode(1, 'render/AmbientLight', ['#ffffff', 0.3]),
         makeNode(2, 'render/DirectionalLight', ['#ff0000', 5, 1, -1, 0]),
         makeNode(3, 'render/LightRig'),
-        makeNode(4, 'render/Shadow', [true, '2048', 0.001, 2]),
+        makeNode(4, 'render/Shadow', ['2048', 0.001, 2]),
         makeNode(5, 'scene/Root'),
         makeNode(6, 'material/Surface', ['pbr']),
       ],
@@ -204,6 +204,7 @@ describe('compileWorkflow', () => {
         [2, 2, 0, 3, 1, 'LIGHT'],
         [3, 3, 0, 5, 2, 'LIGHTS'],
         [4, 6, 0, 5, 1, 'MATERIAL'],
+        [5, 4, 0, 5, 3, 'SHADOW'],
       ],
     )
     const program = compileWorkflow(workflow)
@@ -214,9 +215,16 @@ describe('compileWorkflow', () => {
     expect(program.lighting.lights[1].type).toBe('directional')
     expect(program.lighting.lights[1].intensity).toBe(5)
     expect(program.lighting.lights[1].direction[1]).toBeCloseTo(-0.707, 2)
-    expect(program.lighting.shadow?.enabled).toBe(true)
     expect(program.lighting.shadow?.mapSize).toBe(2048)
     expect(program.lighting.shadow?.softness).toBe(2)
+  })
+
+  it('未连接阴影节点时没有阴影', () => {
+    const workflow = makeWorkflow(
+      [makeNode(1, 'render/Shadow', ['2048', 0.001, 2]), makeNode(2, 'scene/Root')],
+      [],
+    )
+    expect(compileWorkflow(workflow).lighting.shadow).toBeNull()
   })
 
   it('未连接灯光组时回退默认光照', () => {

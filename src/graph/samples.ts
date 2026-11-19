@@ -6,7 +6,7 @@ import type { WorkflowUI } from './workflow'
  */
 export const SHADER_DEMO_WORKFLOW: WorkflowUI = {
   last_node_id: 11,
-  last_link_id: 8,
+  last_link_id: 9,
   nodes: [
     {
       id: 1,
@@ -31,6 +31,7 @@ export const SHADER_DEMO_WORKFLOW: WorkflowUI = {
         { name: 'geometry', type: 'GEOMETRY', link: 1 },
         { name: 'material', type: 'MATERIAL', link: 4 },
         { name: 'lights', type: 'LIGHTS', link: 8 },
+        { name: 'shadow', type: 'SHADOW', link: 9 },
       ],
       outputs: [],
       widgets_values: [],
@@ -149,9 +150,9 @@ export const SHADER_DEMO_WORKFLOW: WorkflowUI = {
       size: [200, 150],
       mode: 0,
       inputs: [],
-      outputs: [],
-      widgets_values: [true, '1024', 0.0015, 2],
-      widget_names: ['enabled', 'mapSize', 'bias', 'softness'],
+      outputs: [{ name: 'shadow', type: 'SHADOW', links: [9] }],
+      widgets_values: ['1024', 0.0015, 2],
+      widget_names: ['mapSize', 'bias', 'softness'],
     },
   ],
   links: [
@@ -163,6 +164,7 @@ export const SHADER_DEMO_WORKFLOW: WorkflowUI = {
     [6, 8, 0, 10, 0, 'LIGHT'],
     [7, 9, 0, 10, 1, 'LIGHT'],
     [8, 10, 0, 2, 2, 'LIGHTS'],
+    [9, 11, 0, 2, 3, 'SHADOW'],
   ],
   groups: [],
   config: {

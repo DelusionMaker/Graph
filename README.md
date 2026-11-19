@@ -35,7 +35,7 @@ npm test
 ```bash
 npm run verify:canvas      # 画布交互逐项回归
 npm run verify:acceptance  # 阶段 5 全流程验收（示例工作流 / 性能 / 异常路径）
-npm run verify:3d          # 3D / Shader / 后处理验收（36 项）
+npm run verify:3d          # 3D / Shader / 后处理验收（37 项）
 ```
 
 示例工作流见 `examples/shader-demo.workflow.json`，也可以在应用内点「载入 3D 示例」直接载入。启动时若没有本地数据，会自动以同一份示例（去掉连线）作为种子图。
@@ -67,7 +67,7 @@ npm run verify:3d          # 3D / Shader / 后处理验收（36 项）
 | 3D 预览 | 左栏 R3F 视口；Box / Sphere / TorusKnot / glTF 上传、线框模式；OrbitControls；相机随工作流保存（schema v2） |
 | Shader 节点 | 22 个端口类型、23 个场景/材质/光照/shader/后处理节点；自定义 PBR 与 Unlit |
 | 自定义光照 | Ambient / Directional / Point 节点 + LightRig；GGX BRDF 在片元 shader 中计算 |
-| 自定义阴影 | `render/Shadow` + 独立 depth pass + 3×3 PCF；不使用 three 的 Light / shadowMap |
+| 自定义阴影 | `render/Shadow` 连接到 Scene Root 即启用（断开即关闭）；独立 depth pass + 3×3 PCF，不使用 three 的 Light / shadowMap |
 | 实时编译 | 结构签名区分重编译与 uniform 刷新；编译失败保留上一帧并在节点与 Inspector 标红 |
 | 后处理 | Bloom / SSAO / Vignette / SMAA，按连线顺序执行；空链不渲染 Composer |
 | 资源与性能 | glTF / 贴图上传与释放；FPS / 帧时间 / draw calls / 三角面数 HUD（4Hz） |
@@ -94,12 +94,12 @@ npm run verify:3d          # 3D / Shader / 后处理验收（36 项）
 
 单元测试 `npm test`（Vitest）覆盖 6 个文件 / 57 项：`toPromptAPI` 的连线/静音/Widget 覆盖规则、`parseWorkflow` 的三级校验与索引重建（含 v1 → v2 迁移）、`SnapshotHistory` 的去重/上限/分支截断/合并窗口、编译器的签名/注入/Unlit/错误、后处理链顺序、连接类型矩阵。
 
-`npm run verify:3d` 共 36 项：
+`npm run verify:3d` 共 37 项：
 
 - 几何体切换与工具条 → 节点同步；
 - OrbitControls 相机写回与持久化；
 - uniform-only 更新不改变 `programHash`；
-- 独立光照节点与阴影设置实时生效；
+- 阴影节点连线控制启停，mapSize / bias / softness 可调；光照参数实时生效；
 - Bloom / Vignette 链顺序；
 - 编译错误定位、节点标红、保留上一帧；
 - schema v2 导出导入；
@@ -255,7 +255,7 @@ examples/
 scripts/
 ├── verify-canvas.mjs           # 画布交互逐项回归（62 项）
 ├── verify-acceptance.mjs       # 3D 工作流验收（19 项）
-└── verify-3d.mjs               # 3D / Shader 验收（36 项）
+└── verify-3d.mjs               # 3D / Shader 验收（37 项）
 ```
 
 ## 后续阶段

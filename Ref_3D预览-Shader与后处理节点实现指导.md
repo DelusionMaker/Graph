@@ -180,7 +180,7 @@ export type PortType = (typeof PORT_TYPES)[number]
 | `render/DirectionalLight` | render | — | `light: LIGHT` | `color`, `intensity`, `dirX/Y/Z` | 平行光，方向归一化后传入 shader |
 | `render/PointLight` | render | — | `light: LIGHT` | `color`, `intensity`, `posX/Y/Z`, `decay` | 点光，距离衰减 |
 | `render/LightRig` | render | `light1/2/3: LIGHT` | `lights: LIGHTS` | — | 组合最多 3 盏灯 |
-| `render/Shadow` | render | — | — | `enabled`, `mapSize`, `bias`, `softness` | 自定义 depth pass + PCF |
+| `render/Shadow` | render | — | `shadow: SHADOW` | `mapSize`, `bias`, `softness` | 连接到 Scene Root 即启用；自定义 depth pass + PCF |
 
 **Shader 值域**
 
@@ -336,7 +336,7 @@ export interface CompiledProgram {
   version: number                    // 每次结构变化 +1
   lighting: {
     lights: LightDescriptor[]        // 最多 3 盏，来自 LightRig
-    shadow: ShadowSettings | null    // 来自 render/Shadow
+    shadow: ShadowSettings | null    // Scene Root.shadow 连接的 render/Shadow，null 表示未连接
   }
   uniformDeclarations: string[]      // 必须注入 GLSL 顶部的 uniform 声明
   uniforms: Record<string, UniformValue>

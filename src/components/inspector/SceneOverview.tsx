@@ -60,9 +60,9 @@ export function SceneOverview() {
             ))}
             <li>
               阴影：
-              {lighting.shadow?.enabled
+              {lighting.shadow
                 ? `开启（${lighting.shadow.mapSize}）`
-                : '关闭'}
+                : '关闭（未连接阴影节点）'}
             </li>
           </ul>
         ) : (

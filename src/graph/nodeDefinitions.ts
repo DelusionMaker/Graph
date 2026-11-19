@@ -66,6 +66,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       { name: 'geometry', type: 'GEOMETRY' },
       { name: 'material', type: 'MATERIAL' },
       { name: 'lights', type: 'LIGHTS' },
+      { name: 'shadow', type: 'SHADOW'}
     ],
     outputs: [],
     widgets: [],
@@ -159,11 +160,10 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     type: 'render/Shadow',
     title: '阴影',
     category: '渲染',
-    description: '方向光阴影（自定义 shadow map + PCF）',
+    description: '方向光阴影（自定义 shadow map + PCF）；连接到 Scene Root 即启用',
     inputs: [],
-    outputs: [],
+    outputs: [{ name: 'shadow', type: 'SHADOW' }],
     widgets: [
-      { name: 'enabled', kind: 'boolean', value: true },
       { name: 'mapSize', kind: 'combo', value: '1024', values: ['1024', '2048'] },
       { name: 'bias', kind: 'number', value: 0.0015, step: 0.0005 },
       { name: 'softness', kind: 'slider', value: 1, min: 1, max: 4, step: 1 },

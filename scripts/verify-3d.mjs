@@ -23,6 +23,7 @@ function buildWorkflow(options = {}) {
       { name: 'geometry', type: 'GEOMETRY', link: 1 },
       { name: 'material', type: 'MATERIAL', link: 4 },
       { name: 'lights', type: 'LIGHTS', link: 11 },
+      { name: 'shadow', type: 'SHADOW', link: 12 },
     ], [], []),
     makeNode(3, 'shader/Color', [40, 240], [180, 100], [], [{ name: 'color', type: 'COLOR', links: [2] }], ['#ff3355']),
     makeNode(4, 'material/Surface', [320, 240], [220, 180], [
@@ -39,7 +40,7 @@ function buildWorkflow(options = {}) {
       { name: 'light2', type: 'LIGHT', link: 10 },
       { name: 'light3', type: 'LIGHT', link: null },
     ], [{ name: 'lights', type: 'LIGHTS', links: [11] }], []),
-    makeNode(9, 'render/Shadow', [980, 480], [200, 150], [], [], [true, '1024', 0.0015, 2]),
+    makeNode(9, 'render/Shadow', [980, 480], [200, 150], [], [{ name: 'shadow', type: 'SHADOW', links: [12] }], ['1024', 0.0015, 2]),
   ]
   const links = [
     [1, 1, 0, 2, 0, 'GEOMETRY'],
@@ -49,6 +50,7 @@ function buildWorkflow(options = {}) {
     [9, 6, 0, 8, 0, 'LIGHT'],
     [10, 7, 0, 8, 1, 'LIGHT'],
     [11, 8, 0, 2, 2, 'LIGHTS'],
+    [12, 9, 0, 2, 3, 'SHADOW'],
   ]
 
   // 后处理链：按传入顺序依次串联，最后接 Output
@@ -255,9 +257,18 @@ check(
 check('Surface 兜底不重编译', state.hash === hashBefore, state.hash)
 
 // ---------- A6 独立光照与阴影节点 ----------
-await editWidget(9, 'enabled', false)
+// 断开 Shadow → Root 连线后应无阴影；重新导入带连线的图恢复
+const withoutShadow = buildWorkflow()
+withoutShadow.links = withoutShadow.links.filter((link) => link[5] !== 'SHADOW')
+withoutShadow.nodes.find((node) => node.id === 2).inputs = withoutShadow.nodes
+  .find((node) => node.id === 2)
+  .inputs.filter((port) => port.name !== 'shadow')
+await importWorkflow(withoutShadow)
 state = await programState()
-check('A6 关闭阴影生效', state.lighting?.shadow?.enabled === false, String(state.lighting?.shadow?.enabled))
+check('A6 断开阴影连线后无阴影', state.lighting?.shadow == null, JSON.stringify(state.lighting?.shadow))
+await importWorkflow(buildWorkflow())
+state = await programState()
+check('A6 接入阴影节点后启用', state.lighting?.shadow != null, JSON.stringify(state.lighting?.shadow))
 await editWidget(7, 'intensity', 6)
 state = await programState()
 check(

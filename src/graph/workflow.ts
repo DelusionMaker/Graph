@@ -23,6 +23,7 @@ export const PORT_TYPES = [
   // 光照节点（自定义 shader，不经过 three 的 Light）
   'LIGHT',
   'LIGHTS',
+  'SHADOW',
 ] as const
 
 export type PortType = (typeof PORT_TYPES)[number]
