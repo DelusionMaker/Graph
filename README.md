@@ -2,7 +2,7 @@
 
 按《React-LiteGraph节点面板项目规划》实现的 Web 节点编辑器，**阶段 0–5 与 3D/Shader 扩展均已完成**。LiteGraph 负责图模型与画布交互，React 渲染节点 DOM、Widget、节点库与外围 UI；数据层支持双格式导入导出、持久化与撤销/重做；视觉层提供双主题、LOD、迷你地图、检查器与响应式布局。
 
-在节点图之上实现了 R3F 3D 预览：`scene/Mesh` + `material/Surface` 经 GLSL 编译器生成 Unlit / Lambert / Blinn-Phong / PBR 材质；`render/AmbientLight` / `DirectionalLight` / `PointLight` 经 `render/LightRig` 接入场景，光照与阴影由自写 GLSL 计算（独立 depth pass + PCF / PCSS / VSM），**不使用 three 内置 Light / shadowMap**；`postfx/*` 节点组成后处理链，SSAO 已替换为自写 Effect。
+在节点图之上实现了 R3F 3D 预览：`scene/Mesh` + `material/Surface` 经 GLSL 编译器生成 Unlit / Lambert / Blinn-Phong / PBR 材质；`render/AmbientLight` / `DirectionalLight` / `PointLight` 经 `render/LightRig` 接入场景，光照与阴影由自写 GLSL 计算（独立 depth pass + PCF / PCSS / VSM），**不使用 three 内置 Light / shadowMap**；`postfx/*` 节点组成后处理链，SSAO 与屏幕空间反射 SSR 均为自写 Effect。
 
 ## 环境
 
@@ -35,7 +35,7 @@ npm test
 ```bash
 npm run verify:canvas      # 画布交互逐项回归
 npm run verify:acceptance  # 阶段 5 全流程验收（示例工作流 / 性能 / 异常路径）
-npm run verify:3d          # 3D / Shader / 后处理验收（45 项）
+npm run verify:3d          # 3D / Shader / 后处理验收（47 项）
 ```
 
 示例工作流见 `examples/shader-demo.workflow.json`，也可以在应用内点「载入 3D 示例」直接载入。启动时若没有本地数据，会自动以同一份示例（去掉连线）作为种子图。
@@ -65,14 +65,14 @@ npm run verify:3d          # 3D / Shader / 后处理验收（45 项）
 | 响应式 | 1280px / 1920px 无溢出，窄屏逐级收起检查器与节点库 |
 | 无障碍 | 画布/按钮/Widget 均有可访问名称，键盘焦点可见，尊重 `prefers-reduced-motion` |
 | 3D 预览 | 左栏 R3F 视口；Box / Sphere / TorusKnot / glTF 上传、线框模式；OrbitControls；相机随工作流保存（schema v2） |
-| Shader 节点 | 13 个端口类型、23 个场景/材质/光照/shader/后处理节点；支持 Unlit / Lambert / Blinn-Phong / PBR |
+| Shader 节点 | 13 个端口类型、24 个场景/材质/光照/shader/后处理节点；支持 Unlit / Lambert / Blinn-Phong / PBR |
 | 自定义光照 | Ambient / Directional / Point 节点 + LightRig；GGX / Lambert / Blinn-Phong BRDF 由片元 shader 生成 |
-| 自定义阴影 | `render/Shadow` 连接到 Scene Root 即启用；独立 depth pass + PCF / PCSS / VSM，不使用 three 的 Light / shadowMap；VSM 不支持时回退 PCF |
+| 自定义阴影 | `render/Shadow` 连接到 Scene Root 即启用；独立 depth pass + PCF / PCSS / VSM，不使用 three 的 Light / shadowMap；按 caster 包围盒动态拟合光源相机，支持 normalBias；VSM 不支持时回退 PCF |
 | 实时编译 | 结构签名区分重编译与 uniform 刷新；算法 Method 变化触发重编译，采样参数只刷新 uniform |
-| 后处理 | Bloom / 自定义 SSAO / Vignette / SMAA，按连线顺序执行；自定义 SSAO 使用自写 GLSL Effect，空链不渲染 Composer |
+| 后处理 | Bloom / 自定义 SSAO / 屏幕空间反射 SSR / Vignette / SMAA，按连线顺序执行；SSAO 与 SSR 均为自写 GLSL Effect，空链不渲染 Composer |
 | 资源与性能 | glTF / 贴图上传与释放；FPS / 帧时间 / draw calls / 三角面数 HUD（4Hz） |
 
-内置 23 种节点：场景、材质、光照、shader 与后处理节点。端口类型 13 项（通用标量、shader 值、资源、光照）。
+内置 24 种节点：场景、材质、光照、shader 与后处理节点。端口类型 13 项（通用标量、shader 值、资源、光照）。
 
 右侧「开发验证」面板可手动测量几何偏差与原生绘制隐藏情况；`window.__graphDebug` 提供同一套测量接口与导入导出/撤销重做入口供自动化脚本调用（仅开发构建挂载）。
 
@@ -94,14 +94,14 @@ npm run verify:3d          # 3D / Shader / 后处理验收（45 项）
 
 单元测试 `npm test`（Vitest）覆盖 6 个文件 / 57 项：`toPromptAPI` 的连线/静音/Widget 覆盖规则、`parseWorkflow` 的三级校验与索引重建（含 v1 → v2 迁移）、`SnapshotHistory` 的去重/上限/分支截断/合并窗口、编译器的多着色模型 / 多阴影方法 / 签名 / 注入 / 错误、后处理链顺序、连接类型矩阵。
 
-`npm run verify:3d` 共 45 项：
+`npm run verify:3d` 共 47 项：
 
 - 几何体切换与工具条 → 节点同步；
 - OrbitControls 相机写回与持久化；
 - uniform-only 更新不改变 `programHash`；
 - 阴影节点连线控制启停，mapSize / bias / softness 可调；光照参数实时生效；
 - PCSS / VSM 方法切换触发重编译，采样参数只刷新 uniform；VSM 模式无未捕获异常；
-- Bloom / Vignette 链顺序；自定义 SSAO 链生效且无 shader 编译错误；
+- Bloom / Vignette 链顺序；自定义 SSAO 与屏幕空间反射 SSR 链生效且无 shader 编译错误；
 - 编译错误定位、节点标红、保留上一帧；
 - schema v2 导出导入；
 - glTF 有效上传与无效文件拦截；
@@ -110,7 +110,7 @@ npm run verify:3d          # 3D / Shader / 后处理验收（45 项）
 
 ## 阶段 5 验收报告
 
-`npm run verify:acceptance` 覆盖 3D 工作流全流程检查，**19/19 通过**。3D / Shader 扩展验收见 `npm run verify:3d`（45/45）。
+`npm run verify:acceptance` 覆盖 3D 工作流全流程检查，**19/19 通过**。3D / Shader 扩展验收见 `npm run verify:3d`（47/47）。
 
 | 验收项 | 结果 |
 |---|---|
@@ -137,9 +137,10 @@ npm run verify:3d          # 3D / Shader / 后处理验收（45 项）
 - 导入只接受 UI 格式（`nodes/links`）；执行格式用于导出，不支持反向还原布局；
 - `shader/Texture` 的贴图通过工具条「贴图」上传并写回第一个 Texture 节点，暂不支持拖拽到指定节点；
 - Surface 的兜底常量在上游连线时被覆盖，Inspector 会显示来源节点；
-- 自定义阴影只取第一盏平行光作为投影光源，点光与环境光不投影；光源相机仍使用固定正交范围；
+- 自定义阴影仍只取第一盏平行光作为投影光源，点光与环境光不投影；已按 caster 包围盒动态拟合光源相机；
 - VSM 已做 WebGL2 / `EXT_color_buffer_float` 检测和 PCF 回退，但 blur 半径与 light bleeding 修正仍为固定值；
-- 自定义 SSAO 为单 Pass 深度 / 法线采样，尚无双边模糊、半分辨率、时域降噪或库版 Firefox 降级；
+- 自定义 SSAO 已加入深度双边权重与 WebGL2 能力检测，但仍是单 Pass，尚无独立双边模糊 Pass、半分辨率或时域降噪；
+- 屏幕空间反射 SSR 基于深度 / 法线单步光线步进，仅能反射屏幕内可见信息，无时序稳定性与屏幕外回退；
 - 构建产物约 1.5 MB（three 全量），尚未分包；
 - glTF 动画、骨骼、多材质槽仍属 Out of Scope。
 
@@ -248,15 +249,18 @@ src/
 │       ├── lighting.ts         # 灯光循环与经典 BRDF
 │       └── shadow.ts           # PCF / PCSS / VSM 采样 GLSL
 ├── viewer/                     # R3F 渲染层
-│   ├── Viewport3D.tsx / SceneRoot.tsx（含自定义 depth pass）
+│   ├── Viewport3D.tsx / SceneRoot.tsx
 │   ├── ModelAsset.tsx / material.ts / assets.ts
-│   ├── passes/vsm.ts           # VSM moments / blur RenderTarget 工具
+│   ├── passes/
+│   │   ├── ShadowPassScheduler.tsx # 深度 / VSM Pass 调度与动态光源相机
+│   │   ├── targetPool.ts           # RenderTarget 创建与释放
+│   │   └── vsm.ts                  # VSM moments / blur 工具
 │   └── useViewerStore.ts / requestFrame.ts / contextLoss.ts
 ├── postfx/                     # 后处理链
 │   ├── chain.ts                # Output 逆序收集
 │   ├── PostFXStack.tsx         # EffectComposer
-│   ├── customSSAO.ts           # 自写 SSAO GLSL 与 Effect
-│   └── CustomSSAOEffect.tsx    # 自定义 SSAO R3F 接入
+│   ├── customSSAO.ts / CustomSSAOEffect.tsx
+│   └── ssr.ts / ScreenSpaceReflectionEffect.tsx
 ├── perf/                       # 性能采样
 │   └── PerfProbe.tsx / usePerfStore.ts / PerfHUD.tsx
 examples/
@@ -264,9 +268,9 @@ examples/
 scripts/
 ├── verify-canvas.mjs           # 画布交互逐项回归（62 项）
 ├── verify-acceptance.mjs       # 3D 工作流验收（19 项）
-└── verify-3d.mjs               # 3D / Shader 验收（45 项）
+└── verify-3d.mjs               # 3D / Shader 验收（47 项）
 ```
 
 ## 后续阶段
 
-阶段 0–5、3D/Shader 扩展与「单一场景算法切换」阶段 0–4 已完成。算法方向的后续可选工作：PBR 完整化（IBL / 法线贴图 / tone mapping）、动态光源相机与点光阴影、SSAO 双边模糊与降噪、屏幕空间光线追踪 Spike。编辑器方向仍可继续：节点复制粘贴、画布内搜索定位、节点库分组折叠、自动布局、Group 渲染与导出、three 分包、编译 Worker 化、执行格式反向导入与后端联调。
+阶段 0–5、3D/Shader 扩展、「单一场景算法切换」阶段 0–4，以及屏幕空间反射 SSR 均已完成。当前 WebGL/GLSL 架构内仍可继续：PBR 完整化（IBL / 法线贴图 / tone mapping）、点多灯阴影、SSAO 独立模糊 Pass / 半分辨率 / 时域降噪。真正的 WebGPU path tracing 需要重写渲染器，应作为独立 Spike，不属于当前主链路。编辑器方向仍可继续：节点复制粘贴、画布内搜索定位、节点库分组折叠、自动布局、Group 渲染与导出、three 分包、编译 Worker 化、执行格式反向导入与后端联调。

@@ -67,6 +67,8 @@ export interface ShadowSettings {
   blockerSamples: number
   /** PCSS / PCF 可变半径采样数上限 32 */
   pcfSamples: number
+  /** 按表面法线方向推离接收点的距离，抑制 shadow acne */
+  normalBias: number
 }
 
 export interface LightingSettings {
@@ -311,6 +313,7 @@ function readShadow(
       4,
       Math.min(32, Math.round(readNumber(readWidgetValue(node, 'pcfSamples'), 16))),
     ),
+    normalBias: Math.max(0, Math.min(0.2, readNumber(readWidgetValue(node, 'normalBias'), 0.02))),
   }
 }
 

@@ -111,7 +111,7 @@ function buildWorkflow(options = {}) {
       [200, 150],
       [],
       [{ name: 'shadow', type: 'SHADOW', links: [12] }],
-      ['1024', 0.0015, 2, 'pcf', 6, 8, 16],
+      ['1024', 0.0015, 2, 'pcf', 6, 8, 16, 0.02],
     ),
   ]
   const links = [
@@ -461,6 +461,23 @@ check(
   'A7 自定义 SSAO 无 shader 编译错误',
   ssaoShaderErrors.length === 0 && pageErrors.length === 0,
   [...ssaoShaderErrors, ...pageErrors].join(' | ') || '0',
+)
+
+await importWorkflow(buildWorkflow({ postfx: ['SSR'] }))
+await page.waitForTimeout(700)
+state = await programState()
+const ssrShaderErrors = consoleErrors.filter((message) =>
+  /WebGLProgram|Shader Error|shader compilation/i.test(message),
+)
+check(
+  'A7 屏幕空间反射链生效',
+  JSON.stringify(state.postfx) === JSON.stringify(['SSR']),
+  JSON.stringify(state.postfx),
+)
+check(
+  'A7 SSR 无 shader 编译错误',
+  ssrShaderErrors.length === 0 && pageErrors.length === 0,
+  [...ssrShaderErrors, ...pageErrors].join(' | ') || '0',
 )
 
 await importWorkflow(buildWorkflow({ postfx: ['Bloom', 'Vignette'] }))

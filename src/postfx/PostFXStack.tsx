@@ -3,6 +3,7 @@ import { useMemo, type ReactElement } from 'react'
 import { useProgramStore } from '../shader/useProgramStore'
 import type { PostFXDescriptor } from './chain'
 import { CustomSSAO } from './CustomSSAOEffect'
+import { ScreenSpaceReflection } from './ScreenSpaceReflectionEffect'
 
 const EMPTY: PostFXDescriptor[] = []
 
@@ -35,6 +36,16 @@ function renderEffect(item: PostFXDescriptor): ReactElement | null {
           worldProximityFalloff={numberParam(params.worldProximityFalloff, 0.1)}
         />
       )
+    case 'SSR':
+      return (
+        <ScreenSpaceReflection
+          key={item.id}
+          samples={numberParam(params.samples, 12)}
+          maxDistance={numberParam(params.maxDistance, 6)}
+          thickness={numberParam(params.thickness, 0.3)}
+          intensity={numberParam(params.intensity, 0.6)}
+        />
+      )
     case 'Vignette':
       return (
         <Vignette
@@ -64,7 +75,7 @@ export function PostFXStack() {
     .map(renderEffect)
     .filter((element): element is ReactElement => element !== null)
   // SSAO 依赖 NormalPass，未开启时组件会直接报错并返回空 effect
-  const needsNormalPass = chain.some((item) => item.type === 'SSAO')
+  const needsNormalPass = chain.some((item) => item.type === 'SSAO' || item.type === 'SSR')
 
   return (
     <EffectComposer key={chainHash} multisampling={0} enableNormalPass={needsNormalPass}>

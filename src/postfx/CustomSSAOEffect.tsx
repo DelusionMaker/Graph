@@ -1,4 +1,4 @@
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { EffectComposerContext } from '@react-three/postprocessing'
 import { forwardRef, useContext, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import { CustomSSAOEffect, type CustomSSAOOptions } from './customSSAO'
@@ -18,6 +18,8 @@ export const CustomSSAO = forwardRef<CustomSSAOEffect, CustomSSAOProps>(function
   ref,
 ) {
   const { camera, normalPass } = useContext(EffectComposerContext)
+  const gl = useThree((state) => state.gl)
+  const supported = gl.capabilities.isWebGL2
   const normalBuffer = normalPass?.texture ?? null
   const initialOptions = useRef<CustomSSAOOptions>({
     samples,
@@ -59,5 +61,5 @@ export const CustomSSAO = forwardRef<CustomSSAOEffect, CustomSSAOProps>(function
 
   useImperativeHandle(ref, () => effect, [effect])
 
-  return <primitive object={effect} dispose={null} />
+  return supported ? <primitive object={effect} dispose={null} /> : null
 })

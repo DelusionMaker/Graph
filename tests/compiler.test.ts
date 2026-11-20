@@ -233,7 +233,7 @@ describe('compileWorkflow', () => {
         makeNode(1, 'render/AmbientLight', ['#ffffff', 0.3]),
         makeNode(2, 'render/DirectionalLight', ['#ff0000', 5, 1, -1, 0]),
         makeNode(3, 'render/LightRig'),
-        makeNode(4, 'render/Shadow', ['2048', 0.001, 2, 'pcss', 6, 12, 24]),
+        makeNode(4, 'render/Shadow', ['2048', 0.001, 2, 'pcss', 6, 12, 24, 0.05]),
         makeNode(5, 'scene/Root'),
         makeNode(6, 'material/Surface', ['pbr']),
       ],
@@ -259,6 +259,8 @@ describe('compileWorkflow', () => {
     expect(program.lighting.shadow?.lightSize).toBe(6)
     expect(program.lighting.shadow?.blockerSamples).toBe(12)
     expect(program.lighting.shadow?.pcfSamples).toBe(24)
+    expect(program.lighting.shadow?.normalBias).toBe(0.05)
+    expect(program.pbr?.fragmentShader).toContain('u_shadowNormalBias')
     expect(program.pbr?.fragmentShader).toContain('SHADOW_MAX_BLOCKER_SAMPLES')
   })
 

@@ -82,7 +82,10 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth,
 
       vec3 sampleViewPosition = ssaoViewPosition(sampleUv, sampledDepth);
       float depthDelta = abs(viewPosition.z - sampleViewPosition.z);
+      // 双边权重：深度差越大，样本对当前像素的遮蔽贡献越小
       float rangeCheck = smoothstep(0.0, 1.0, ssaoRadius / max(depthDelta, 0.001));
+      float bilateralWeight = exp(-depthDelta * depthDelta / (ssaoRadius * ssaoRadius + 0.001));
+      rangeCheck *= bilateralWeight;
       rangeCheck *= 1.0 - smoothstep(
         ssaoDistanceThreshold,
         ssaoDistanceThreshold + ssaoDistanceFalloff + 0.001,

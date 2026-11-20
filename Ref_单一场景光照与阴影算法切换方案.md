@@ -1,9 +1,9 @@
 # 单一场景光照与阴影算法切换方案
 
-> 文档状态：v1.0（阶段 0–4 已落地）  
+> 文档状态：v1.1（阶段 0–4、阴影工程质量项与屏幕空间反射 SSR 已落地）  
 > 日期：2026-11-20  
 > 适用范围：`单一场景内切换不同光照 / 阴影 / 后处理算法`  
-> 当前状态：算法切换主链路已实现并通过单元 / E2E 验证；屏幕空间光线追踪与 WebGPU path tracing 仍属于后续 Spike。
+> 当前状态：WebGL/GLSL 主链路已实现并通过单元 / E2E 验证；真正的 WebGPU path tracing 需要重写渲染器，仍属于独立 Spike。
 
 ---
 
@@ -15,10 +15,12 @@
 | 阶段 1 | Lambert / Blinn-Phong 着色模型、BRDF / lighting chunk 拆分 | 已完成 | compiler 单测，`verify:3d` |
 | 阶段 2 | PCF / PCSS 方法切换、PCSS 参数 uniform 化 | 已完成 | compiler / signature 单测，`verify:3d` |
 | 阶段 3 | VSM moments、模糊、Chebyshev、能力检测与 PCF 回退 | 已完成 | compiler / signature 单测，`verify:3d` |
-| 阶段 4 | 自定义 SSAO Effect、NormalPass / Depth 接入 | 已完成 | `verify:3d` shader 与链验证 |
-| 阶段 5 | 屏幕空间光线追踪 / WebGPU 评估 | 未开始 | 独立 Spike |
+| 阶段 4 | 自定义 SSAO Effect、NormalPass / Depth 接入、深度双边权重与 WebGL2 检测 | 已完成 | `verify:3d` shader 与链验证 |
+| 阴影工程 | `ShadowPassScheduler` / RenderTarget 工具、动态光源相机、normalBias | 已完成 | compiler 单测，`verify:3d` |
+| 阶段 5a | 屏幕空间反射 SSR（深度 / 法线光线步进 Effect） | 已完成 | `verify:3d` shader 与链验证 |
+| 阶段 5b | WebGPU path tracing（BVH / accumulation / denoiser） | 未开始 | 需重写渲染器，独立 Spike |
 
-当前验证基线：`npm test` 57/57，`npm run build` 通过，`npm run verify:3d` 45/45。
+当前验证基线：`npm test` 57/57，`npm run build` 通过，`npm run verify:3d` 47/47。
 
 ---
 
@@ -29,8 +31,8 @@
 - `src/graph/nodeDefinitions.ts` 定义节点、端口和 Widget；
 - `src/shader/compiler.ts` 把 `WorkflowUI` 编译成 `CompiledProgram`；
 - `src/shader/glsl/` 提供 BRDF / lighting / PCF / PCSS / VSM 等 GLSL 生成模块；
-- `src/viewer/SceneRoot.tsx` 创建自定义 `ShaderMaterial`，执行独立深度 pass 与 VSM 离屏 pass；
-- `src/postfx/PostFXStack.tsx` 按节点链顺序执行后处理，SSAO 使用自写 Effect。
+- `src/viewer/passes/ShadowPassScheduler.tsx` 统一调度深度 pass、VSM moments / blur 与动态光源相机；
+- `src/postfx/PostFXStack.tsx` 按节点链顺序执行后处理，SSAO 与 SSR 使用自写 Effect。
 
 在“单一场景内切换算法”这个范围内，结论是：
 
@@ -548,13 +550,12 @@ src/viewer/passes/
 
 ## 12. 下一步建议
 
-阶段 0–4 已按上述顺序完成。剩余工作建议：
+阶段 0–4、阴影工程质量项、SSR 已完成。当前 WebGL/GLSL 架构内剩余工作建议：
 
-1. 文档与示例同步：README、方案状态、示例工作流新增 Widget 默认值。
-2. 阴影工程化：把 depth / VSM pass 从 `SceneRoot.tsx` 进一步抽成 `PassScheduler` 与 RenderTarget 池。
-3. 阴影质量：动态光源相机、`normalBias`、多方向光 / 点光阴影。
-4. 自写 SSAO 质量：双边模糊、半分辨率、时域降噪、Firefox / 库版 fallback。
-5. PBR 完整化：IBL、法线贴图、AO / roughness / metalness 贴图、tone mapping。
-6. 光线追踪：先做屏幕空间 ray marching Spike，再评估 WebGPU path tracing。
+1. 阴影：多方向光分别投影、点光 cubemap 阴影、VSM blur / light bleeding 参数化。
+2. SSAO：独立双边模糊 Pass、半分辨率、时域降噪。
+3. SSR：屏幕外回退、时序稳定性、粗糙度模糊。
+4. PBR 完整化：IBL、法线贴图、AO / roughness / metalness 贴图、tone mapping。
+5. WebGPU path tracing：需要独立 Spike，重写渲染器与 shader 语言（BVH、accumulation、denoiser）。
 
 当前主链路已完成，后续均为独立增强项，可按收益和性能预算逐项推进。

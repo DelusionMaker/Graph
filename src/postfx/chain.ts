@@ -3,13 +3,14 @@ import type { UILink, UINode, WorkflowUI } from '../graph/workflow'
 
 export interface PostFXDescriptor {
   id: string
-  type: 'Bloom' | 'SSAO' | 'Vignette' | 'SMAA'
+  type: 'Bloom' | 'SSAO' | 'SSR' | 'Vignette' | 'SMAA'
   params: Record<string, number | boolean>
 }
 
 const POSTFX_TYPE_MAP: Record<string, PostFXDescriptor['type']> = {
   'postfx/Bloom': 'Bloom',
   'postfx/SSAO': 'SSAO',
+  'postfx/SSR': 'SSR',
   'postfx/Vignette': 'Vignette',
   'postfx/FXAA': 'SMAA',
 }

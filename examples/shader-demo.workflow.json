@@ -149,11 +149,11 @@
       "type": "render/Shadow",
       "title": "阴影",
       "pos": [860, 620],
-      "size": [200, 240],
+      "size": [200, 266],
       "mode": 0,
       "inputs": [],
       "outputs": [{ "name": "shadow", "type": "SHADOW", "links": [9] }],
-      "widgets_values": ["1024", 0.0015, 2, "pcf", 6, 8, 16],
+      "widgets_values": ["1024", 0.0015, 2, "pcf", 6, 8, 16, 0.02],
       "widget_names": [
         "mapSize",
         "bias",
@@ -161,7 +161,8 @@
         "method",
         "lightSize",
         "blockerSamples",
-        "pcfSamples"
+        "pcfSamples",
+        "normalBias"
       ]
     }
   ],

@@ -16,6 +16,7 @@ uniform int u_shadowUseVsm;
 uniform mat4 u_lightViewProjection;
 uniform vec3 u_shadowLightDir;
 uniform float u_shadowBias;
+uniform float u_shadowNormalBias;
 uniform float u_shadowTexel;
 uniform float u_shadowSoftness;
 uniform int u_shadowEnabled;
@@ -133,7 +134,7 @@ float shadowFactor(vec3 worldPos, vec3 N) {
   vec3 L = normalize(-u_shadowLightDir);
   if (dot(N, L) <= 0.0) return 1.0;
 
-  vec4 clip = u_lightViewProjection * vec4(worldPos + N * 0.02, 1.0);
+  vec4 clip = u_lightViewProjection * vec4(worldPos + N * u_shadowNormalBias, 1.0);
   vec3 coord = clip.xyz / clip.w;
   coord = coord * 0.5 + 0.5;
 
