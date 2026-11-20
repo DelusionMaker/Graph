@@ -1,9 +1,24 @@
 # 单一场景光照与阴影算法切换方案
 
-> 文档状态：方案草案 v0.1  
+> 文档状态：v1.0（阶段 0–4 已落地）  
 > 日期：2026-11-20  
 > 适用范围：`单一场景内切换不同光照 / 阴影 / 后处理算法`  
-> 本阶段目标：先做方案设计与可行性收敛，不改业务代码。
+> 当前状态：算法切换主链路已实现并通过单元 / E2E 验证；屏幕空间光线追踪与 WebGPU path tracing 仍属于后续 Spike。
+
+---
+
+## 实施结果
+
+| 阶段 | 内容 | 状态 | 验证 |
+|---|---|---|---|
+| 阶段 0 | 阴影 pass 缓存修复、共享阴影 GLSL、按光源应用阴影 | 已完成 | compiler / signature 单测，`verify:3d` |
+| 阶段 1 | Lambert / Blinn-Phong 着色模型、BRDF / lighting chunk 拆分 | 已完成 | compiler 单测，`verify:3d` |
+| 阶段 2 | PCF / PCSS 方法切换、PCSS 参数 uniform 化 | 已完成 | compiler / signature 单测，`verify:3d` |
+| 阶段 3 | VSM moments、模糊、Chebyshev、能力检测与 PCF 回退 | 已完成 | compiler / signature 单测，`verify:3d` |
+| 阶段 4 | 自定义 SSAO Effect、NormalPass / Depth 接入 | 已完成 | `verify:3d` shader 与链验证 |
+| 阶段 5 | 屏幕空间光线追踪 / WebGPU 评估 | 未开始 | 独立 Spike |
+
+当前验证基线：`npm test` 57/57，`npm run build` 通过，`npm run verify:3d` 45/45。
 
 ---
 
@@ -13,9 +28,9 @@
 
 - `src/graph/nodeDefinitions.ts` 定义节点、端口和 Widget；
 - `src/shader/compiler.ts` 把 `WorkflowUI` 编译成 `CompiledProgram`；
-- `src/shader/glsl/chunks.ts` 提供 PBR / Unlit / 阴影采样 GLSL；
-- `src/viewer/SceneRoot.tsx` 创建自定义 `ShaderMaterial`，并执行独立深度 pass；
-- `src/postfx/PostFXStack.tsx` 按节点链顺序执行后处理。
+- `src/shader/glsl/` 提供 BRDF / lighting / PCF / PCSS / VSM 等 GLSL 生成模块；
+- `src/viewer/SceneRoot.tsx` 创建自定义 `ShaderMaterial`，执行独立深度 pass 与 VSM 离屏 pass；
+- `src/postfx/PostFXStack.tsx` 按节点链顺序执行后处理，SSAO 使用自写 Effect。
 
 在“单一场景内切换算法”这个范围内，结论是：
 
@@ -523,22 +538,23 @@ src/viewer/passes/
 | shader 分支过多，维护成本高 | 共用 BRDF / shadow chunk，避免整份复制 |
 | PCSS 采样数过高 | 限制单灯启用，暴露采样数参数并设保守默认 |
 | VSM 浮点 RT 不兼容 | 运行时能力检测，自动回退 PCF |
-| VSM light bleeding | 提供 bleed 修正参数，默认偏保守 |
-| 阴影 pass 资源泄漏 | RenderTarget 池化管理，切换/卸载统一 dispose |
-| 方向变化阴影不更新 | 修 pass 缓存 key，写回归测试 |
+| VSM light bleeding | 当前使用固定 0.15 修正，尚未暴露参数 |
+| 阴影 pass 资源泄漏 | 当前已统一 dispose；RenderTarget 池化仍待后续 |
+| 方向变化阴影不更新 | 已修 pass 缓存 key，E2E 覆盖 |
 | 老工作流参数错位 | 新 Widget 追加末尾，读取端提供默认值 |
-| 画质对比不明显 | 固定测试场景与相机，使用截图回归 |
+| 画质对比不明显 | 尚未做截图回归，后续补固定场景截图 |
 
 ---
 
 ## 12. 下一步建议
 
-建议按以下顺序推进：
+阶段 0–4 已按上述顺序完成。剩余工作建议：
 
-1. 先完成阶段 0，修阴影基础问题。
-2. 再做阶段 1，交付 Lambert / Blinn-Phong。
-3. 根据阶段 1 的 shader 结构重构效果，再决定 PCSS / VSM 的具体接入方式。
-4. SSAO 自写单独作为一个阶段，不与阴影重构混在一起。
-5. 光线追踪另起 Spike，不进入本轮主实现。
+1. 文档与示例同步：README、方案状态、示例工作流新增 Widget 默认值。
+2. 阴影工程化：把 depth / VSM pass 从 `SceneRoot.tsx` 进一步抽成 `PassScheduler` 与 RenderTarget 池。
+3. 阴影质量：动态光源相机、`normalBias`、多方向光 / 点光阴影。
+4. 自写 SSAO 质量：双边模糊、半分辨率、时域降噪、Firefox / 库版 fallback。
+5. PBR 完整化：IBL、法线贴图、AO / roughness / metalness 贴图、tone mapping。
+6. 光线追踪：先做屏幕空间 ray marching Spike，再评估 WebGPU path tracing。
 
-如果方案确认，下一步可以先从 `brdf.ts` / `shadow.ts` 的 chunk 拆分和 `CompiledProgram` 的 shader variant 扩展开始。
+当前主链路已完成，后续均为独立增强项，可按收益和性能预算逐项推进。

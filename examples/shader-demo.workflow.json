@@ -48,7 +48,7 @@
       "type": "material/Surface",
       "title": "Surface 材质",
       "pos": [340, 240],
-      "size": [220, 250],
+      "size": [220, 300],
       "mode": 0,
       "inputs": [
         { "name": "baseColor", "type": "COLOR", "link": 2 },
@@ -57,8 +57,16 @@
         { "name": "emissive", "type": "COLOR", "link": null }
       ],
       "outputs": [{ "name": "material", "type": "MATERIAL", "links": [4] }],
-      "widgets_values": ["pbr", "#ff8a5c", 0.35, 0.2, "#000000"],
-      "widget_names": ["shading", "baseColor", "roughness", "metalness", "emissive"]
+      "widgets_values": ["pbr", "#ff8a5c", 0.35, 0.2, "#000000", 32, 0.5],
+      "widget_names": [
+        "shading",
+        "baseColor",
+        "roughness",
+        "metalness",
+        "emissive",
+        "shininess",
+        "specularStrength"
+      ]
     },
     {
       "id": 5,
@@ -141,12 +149,20 @@
       "type": "render/Shadow",
       "title": "阴影",
       "pos": [860, 620],
-      "size": [200, 150],
+      "size": [200, 240],
       "mode": 0,
       "inputs": [],
       "outputs": [{ "name": "shadow", "type": "SHADOW", "links": [9] }],
-      "widgets_values": ["1024", 0.0015, 2],
-      "widget_names": ["mapSize", "bias", "softness"]
+      "widgets_values": ["1024", 0.0015, 2, "pcf", 6, 8, 16],
+      "widget_names": [
+        "mapSize",
+        "bias",
+        "softness",
+        "method",
+        "lightSize",
+        "blockerSamples",
+        "pcfSamples"
+      ]
     }
   ],
   "links": [
