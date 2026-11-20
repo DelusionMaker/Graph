@@ -6,12 +6,20 @@ import {
   getEmitter,
   type EmitContext,
   type EmitResult,
+  type ShadingModel,
   type TextureSlot,
   type UniformKind,
   type UniformSource,
 } from './emitters'
 import { parseColor, readNumber } from './emitters/values'
-import { PBR_VERTEX, UNLIT_VERTEX, pbrFragment, unlitFragment } from './glsl/chunks'
+import {
+  PBR_VERTEX,
+  UNLIT_VERTEX,
+  blinnPhongFragment,
+  lambertFragment,
+  pbrFragment,
+  unlitFragment,
+} from './glsl/chunks'
 import { computeSignature } from './signature'
 
 export type MeshShape = 'box' | 'sphere' | 'torusknot' | 'gltf'
@@ -57,6 +65,11 @@ export interface LightingSettings {
   shadow: ShadowSettings | null
 }
 
+export interface ShaderSource {
+  vertexShader: string
+  fragmentShader: string
+}
+
 export interface CompiledProgram {
   /** 结构签名短哈希 */
   hash: string
@@ -68,14 +81,16 @@ export interface CompiledProgram {
   textureSlots: TextureSlot[]
   lighting: LightingSettings
   postfxChain: PostFXDescriptor[]
-  shading: 'pbr' | 'unlit'
+  shading: ShadingModel
   mesh: MeshSettings
   /** true 表示 mesh 由 scene/Mesh 节点驱动；false 时视口回退到工具条状态 */
   meshFromNode: boolean
   activeRootId: number | null
   activeOutputId: number | null
-  pbr: { vertexShader: string; fragmentShader: string } | null
-  unlit: { vertexShader: string; fragmentShader: string } | null
+  pbr: ShaderSource | null
+  unlit: ShaderSource | null
+  lambert: ShaderSource | null
+  blinnPhong: ShaderSource | null
   warnings: string[]
 }
 
@@ -370,6 +385,16 @@ export function compileWorkflow(workflow: WorkflowUI): CompiledProgram {
       ? { vertexShader: PBR_VERTEX, fragmentShader: pbrFragment(declarations, surface) }
       : null
 
+  const lambert =
+    surface && shading === 'lambert'
+      ? { vertexShader: PBR_VERTEX, fragmentShader: lambertFragment(declarations, surface) }
+      : null
+
+  const blinnPhong =
+    surface && shading === 'blinnPhong'
+      ? { vertexShader: PBR_VERTEX, fragmentShader: blinnPhongFragment(declarations, surface) }
+      : null
+
   const unlit =
     shading === 'unlit' && surface
       ? {
@@ -399,6 +424,8 @@ export function compileWorkflow(workflow: WorkflowUI): CompiledProgram {
     activeOutputId: activeOutput?.id ?? null,
     pbr,
     unlit,
+    lambert,
+    blinnPhong,
     warnings,
   }
 }

@@ -36,7 +36,7 @@ export interface GraphDebugApi {
   programState: () => {
     status: string
     hash: string
-    shading: 'pbr' | 'unlit' | null
+    shading: WorkflowProgramSnapshot['shading'] | null
     mesh: WorkflowProgramSnapshot['mesh'] | null
     lighting: WorkflowProgramSnapshot['lighting'] | null
     postfx: string[]

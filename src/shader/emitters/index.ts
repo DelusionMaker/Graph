@@ -28,12 +28,17 @@ export interface TextureSlot {
   flipY: boolean
 }
 
+export type ShadingModel = 'pbr' | 'unlit' | 'lambert' | 'blinnPhong'
+
 export interface SurfaceEmit {
-  shading: 'pbr' | 'unlit'
+  shading: ShadingModel
   color: string
   roughness: string
   metalness: string
   emissive: string
+  /** 仅 Blinn-Phong 使用 */
+  shininess?: string
+  specularStrength?: string
 }
 
 export interface EmitResult {

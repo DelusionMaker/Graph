@@ -82,7 +82,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     type: 'material/Surface',
     title: 'Surface 材质',
     category: '材质',
-    description: 'PBR 或 Unlit 表面输出',
+    description: 'PBR / Lambert / Blinn-Phong / Unlit 表面输出',
     inputs: [
       { name: 'baseColor', type: 'COLOR' },
       { name: 'roughness', type: 'FLOAT' },
@@ -91,12 +91,20 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     ],
     outputs: [{ name: 'material', type: 'MATERIAL' }],
     widgets: [
-      { name: 'shading', kind: 'combo', value: 'pbr', values: ['pbr', 'unlit'] },
+      {
+        name: 'shading',
+        kind: 'combo',
+        value: 'pbr',
+        values: ['pbr', 'unlit', 'lambert', 'blinnPhong'],
+      },
       // 未连线时的兜底常量；连线后以上游节点为准
       { name: 'baseColor', kind: 'text', value: '#8b9cff' },
       { name: 'roughness', kind: 'slider', value: 0.5, min: 0, max: 1, step: 0.01 },
       { name: 'metalness', kind: 'slider', value: 0.2, min: 0, max: 1, step: 0.01 },
       { name: 'emissive', kind: 'text', value: '#000000' },
+      // 新参数追加在末尾，保证老工作流的 widgets_values 索引不变
+      { name: 'shininess', kind: 'number', value: 32, min: 1, max: 256, step: 1 },
+      { name: 'specularStrength', kind: 'slider', value: 0.5, min: 0, max: 1, step: 0.01 },
     ],
     codeAffectingWidgets: ['shading'],
     width: 220,

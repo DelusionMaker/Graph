@@ -1,4 +1,4 @@
-import type { EmitContext, EmitResult } from './index'
+import type { EmitContext, EmitResult, ShadingModel } from './index'
 import { parseColor, readNumber } from './values'
 
 /** 把上游结果降维成 float 表达式（VEC3/COLOR 取 x，VEC2 取 x） */
@@ -33,8 +33,14 @@ function fallbackColor(ctx: EmitContext, name: string, fallback: [number, number
   })
 }
 
+function readShadingModel(value: unknown): ShadingModel {
+  const text = String(value ?? 'pbr')
+  if (text === 'unlit' || text === 'lambert' || text === 'blinnPhong') return text
+  return 'pbr'
+}
+
 export function emitSurface(ctx: EmitContext): EmitResult {
-  const shading = String(ctx.widget('shading') ?? 'pbr') === 'unlit' ? 'unlit' : 'pbr'
+  const shading = readShadingModel(ctx.widget('shading'))
 
   const colorInput = ctx.input('baseColor')
   const roughnessInput = ctx.input('roughness')
@@ -55,9 +61,22 @@ export function emitSurface(ctx: EmitContext): EmitResult {
     ? asVec3(emissiveInput.expr, emissiveInput.type)
     : fallbackColor(ctx, 'emissive', [0, 0, 0])
 
+  // Blinn-Phong 专用参数只在需要时注册，避免其他模型出现无用 uniform
+  const shininess = shading === 'blinnPhong' ? fallbackFloat(ctx, 'shininess', 32) : undefined
+  const specularStrength =
+    shading === 'blinnPhong' ? fallbackFloat(ctx, 'specularStrength', 0.5) : undefined
+
   return {
     expr: '',
     type: 'MATERIAL',
-    surface: { shading, color, roughness, metalness, emissive },
+    surface: {
+      shading,
+      color,
+      roughness,
+      metalness,
+      emissive,
+      shininess,
+      specularStrength,
+    },
   }
 }

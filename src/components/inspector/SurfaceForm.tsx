@@ -17,11 +17,20 @@ export function SurfaceForm({ node }: { node: NodeSnapshot }) {
   const links = useGraphStore((state) => state.links)
   const nodes = useGraphStore((state) => state.nodes)
   const shadingWidget = node.widgets.find((widget) => widget.name === 'shading')
+  const shading = String(shadingWidget?.value ?? 'pbr')
+  const shininessWidget = node.widgets.find((widget) => widget.name === 'shininess')
+  const specularWidget = node.widgets.find((widget) => widget.name === 'specularStrength')
 
   return (
     <section>
       <h3>材质</h3>
       {shadingWidget && <Widget nodeId={node.id} widget={shadingWidget} />}
+      {shading === 'blinnPhong' && shininessWidget && (
+        <Widget nodeId={node.id} widget={shininessWidget} label="高光指数" />
+      )}
+      {shading === 'blinnPhong' && specularWidget && (
+        <Widget nodeId={node.id} widget={specularWidget} label="高光强度" />
+      )}
 
       <div className="inspector-inputs">
         {node.inputs.map((input) => {

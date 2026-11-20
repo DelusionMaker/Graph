@@ -73,6 +73,8 @@ describe('compileWorkflow', () => {
     expect(program.pbr?.fragmentShader).toContain('u_5_value')
     expect(program.pbr?.fragmentShader).toContain('evaluateLight0')
     expect(program.pbr?.fragmentShader).toContain('u_lightCount')
+    expect(program.pbr?.fragmentShader).toContain('u_shadowLightIndex')
+    expect(program.pbr?.fragmentShader).toContain('shadow0')
 
     const color = program.uniforms.u_3_value.value as number[]
     expect(color[0]).toBeCloseTo(1)
@@ -110,6 +112,42 @@ describe('compileWorkflow', () => {
     expect(program.unlit?.fragmentShader).toContain('gl_FragColor')
     expect(program.unlit?.vertexShader).toContain('vShaderUv')
     expect(program.unlit?.fragmentShader).toContain('u_3_value')
+  })
+
+  it('Lambert 模式生成经典光照 shader', () => {
+    const workflow = buildMaterialGraph()
+    const changed: WorkflowUI = {
+      ...workflow,
+      nodes: workflow.nodes.map((node) =>
+        node.id === 4 ? { ...node, widgets_values: ['lambert'] } : node,
+      ),
+    }
+
+    expect(computeSignature(changed)).not.toBe(compileWorkflow(workflow).hash)
+    const program = compileWorkflow(changed)
+    expect(program.shading).toBe('lambert')
+    expect(program.pbr).toBeNull()
+    expect(program.lambert?.fragmentShader).toContain('evaluateLight0')
+    expect(program.lambert?.fragmentShader).toContain('baseColor / PI')
+    expect(program.lambert?.fragmentShader).toContain('u_3_value')
+    expect(program.lambert?.fragmentShader).toContain('u_shadowLightIndex')
+  })
+
+  it('Blinn-Phong 模式生成高光参数 uniform', () => {
+    const workflow = buildMaterialGraph()
+    const changed: WorkflowUI = {
+      ...workflow,
+      nodes: workflow.nodes.map((node) =>
+        node.id === 4 ? { ...node, widgets_values: ['blinnPhong'] } : node,
+      ),
+    }
+
+    const program = compileWorkflow(changed)
+    expect(program.shading).toBe('blinnPhong')
+    expect(program.blinnPhong?.fragmentShader).toContain('pow(NdotH')
+    expect(program.blinnPhong?.fragmentShader).toContain('u_4_shininess')
+    expect(program.uniforms.u_4_shininess.value).toBe(32)
+    expect(program.uniforms.u_4_specularStrength.value).toBe(0.5)
   })
 
   it('仅 uniform 变化时 refreshProgram 不改变 hash', () => {

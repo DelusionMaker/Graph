@@ -45,6 +45,7 @@ function useShadowPass(
   material: ShaderMaterial,
   groundMaterial: ShaderMaterial,
   requestFrame: () => void,
+  geometryKey: string,
 ) {
   const gl = useThree((state) => state.gl)
   const scene = useThree((state) => state.scene)
@@ -67,11 +68,10 @@ function useShadowPass(
     if (!target || !directional) return
     const key = [
       program?.hash,
+      geometryKey,
       shadow !== null,
       shadow?.mapSize,
-      shadow?.bias,
-      shadow?.softness,
-      directional.intensity,
+      ...directional.direction,
     ].join('|')
     if (lastKey.current === key) return
     lastKey.current = key
@@ -188,7 +188,12 @@ export function SceneRoot() {
     [material, groundMaterial],
   )
 
-  useShadowPass(program, material, groundMaterial, requestFrame)
+  const mesh = program?.meshFromNode
+    ? { shape: program.mesh.shape, assetId: program.mesh.assetId, scale: program.mesh.scale }
+    : { shape: toolShape, assetId: toolUrl ?? '', scale: toolScale }
+  const geometryKey = `${mesh.shape}|${mesh.assetId}|${mesh.scale}`
+
+  useShadowPass(program, material, groundMaterial, requestFrame, geometryKey)
 
   useFrame((state) => {
     const current = programRef.current
@@ -199,10 +204,6 @@ export function SceneRoot() {
       }
     }
   })
-
-  const mesh = program?.meshFromNode
-    ? { shape: program.mesh.shape, assetId: program.mesh.assetId, scale: program.mesh.scale }
-    : { shape: toolShape, assetId: toolUrl ?? '', scale: toolScale }
 
   return (
     <>

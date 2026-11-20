@@ -79,7 +79,10 @@ function buildLightUniforms(program: CompiledProgram): Record<string, IUniform> 
 
 function buildShadowUniforms(program: CompiledProgram): Record<string, IUniform> {
   const shadow = program.lighting.shadow
-  const directional = program.lighting.lights.find((light) => light.type === 'directional')
+  const directionalIndex = program.lighting.lights.findIndex(
+    (light) => light.type === 'directional',
+  )
+  const directional = directionalIndex >= 0 ? program.lighting.lights[directionalIndex] : null
 
   return {
     // 未渲染 depth pass 时用白色兜底纹理，采样结果 1 = 完全受光
@@ -92,6 +95,8 @@ function buildShadowUniforms(program: CompiledProgram): Record<string, IUniform>
     u_shadowTexel: { value: 1 / (shadow?.mapSize ?? 1024) },
     u_shadowSoftness: { value: shadow?.softness ?? 1 },
     u_shadowEnabled: { value: shadow && directional ? 1 : 0 },
+    // 只让对应的那一盏灯接收阴影；没有投影灯时为 -1
+    u_shadowLightIndex: { value: shadow && directional ? directionalIndex : -1 },
   }
 }
 
@@ -121,11 +126,25 @@ function createFallbackMaterial(): ShaderMaterial {
   })
 }
 
-/** PBR 与 Unlit 都走 ShaderMaterial，光照完全由编译产物里的 GLSL 计算 */
+function selectShaderSource(program: CompiledProgram) {
+  switch (program.shading) {
+    case 'unlit':
+      return program.unlit
+    case 'lambert':
+      return program.lambert
+    case 'blinnPhong':
+      return program.blinnPhong
+    case 'pbr':
+    default:
+      return program.pbr
+  }
+}
+
+/** 所有着色模型都走 ShaderMaterial，光照完全由编译产物里的 GLSL 计算 */
 export function createProgramMaterial(program: CompiledProgram | null): ShaderMaterial {
   if (!program) return createFallbackMaterial()
 
-  const source = program.shading === 'unlit' ? program.unlit : program.pbr
+  const source = selectShaderSource(program)
   if (!source) return createFallbackMaterial()
 
   const material = new ShaderMaterial({
@@ -146,7 +165,7 @@ export function createProgramMaterial(program: CompiledProgram | null): ShaderMa
 export function syncMaterial(material: Material, program: CompiledProgram | null): void {
   if (!(material instanceof ShaderMaterial) || !program) return
 
-  const source = program.shading === 'unlit' ? program.unlit : program.pbr
+  const source = selectShaderSource(program)
   if (!source) return
 
   if (material.userData.hash !== program.hash) {
