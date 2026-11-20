@@ -1,4 +1,5 @@
 import type { PortType } from '../../graph/workflow'
+import { emitHdr } from './hdr'
 import { emitMath, emitMixColor } from './math'
 import { emitSurface } from './surface'
 import { emitTexture } from './texture'
@@ -30,6 +31,12 @@ export interface TextureSlot {
 
 export type ShadingModel = 'pbr' | 'unlit' | 'lambert' | 'blinnPhong'
 
+export interface EnvironmentEmit {
+  sampler: string
+  intensity: string
+  rotation: string
+}
+
 export interface SurfaceEmit {
   shading: ShadingModel
   color: string
@@ -39,12 +46,15 @@ export interface SurfaceEmit {
   /** 仅 Blinn-Phong 使用 */
   shininess?: string
   specularStrength?: string
+  /** 可选 HDR 环境贴图 */
+  environment?: EnvironmentEmit
 }
 
 export interface EmitResult {
   expr: string
   type: PortType
   surface?: SurfaceEmit
+  environment?: EnvironmentEmit
 }
 
 export interface EmitContext {
@@ -75,6 +85,7 @@ const EMITTERS: Record<string, Emitter> = {
   'shader/Position': emitPosition,
   'shader/Time': emitTime,
   'shader/Texture': emitTexture,
+  'texture/HDR': emitHdr,
   'shader/Math': emitMath,
   'shader/MixColor': emitMixColor,
   'shader/Vec3': emitVec3,

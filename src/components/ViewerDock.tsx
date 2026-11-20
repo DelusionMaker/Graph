@@ -8,7 +8,7 @@ import {
 import { useGraphActions } from '../graph/actions'
 import { useGraphStore } from '../graph/store'
 import { useToastStore } from '../graph/toastStore'
-import { createModelUrl, loadTexture, registerAsset } from '../viewer/assets'
+import { createModelUrl, loadHdrTexture, loadTexture, registerAsset } from '../viewer/assets'
 import { useViewerStore } from '../viewer/useViewerStore'
 import { Viewport3D } from '../viewer/Viewport3D'
 
@@ -35,6 +35,12 @@ async function looksLikeGltf(file: File): Promise<boolean> {
   return text.trimStart().startsWith('{')
 }
 
+/** Radiance HDR 文件头应为 "#?RADIANCE" 或 "#?RGBE"。 */
+async function looksLikeHdr(file: File): Promise<boolean> {
+  const text = await file.slice(0, 16).text()
+  return text.startsWith('#?RADIANCE') || text.startsWith('#?RGBE')
+}
+
 /** 左栏：上半 3D 视口 + 下半节点库，中间可拖拽分隔条 */
 export function ViewerDock({ children }: { children: ReactNode }) {
   const [topPercent, setTopPercent] = useState(60)
@@ -59,6 +65,7 @@ export function ViewerDock({ children }: { children: ReactNode }) {
   const dockRef = useRef<HTMLElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const textureRef = useRef<HTMLInputElement>(null)
+  const hdrRef = useRef<HTMLInputElement>(null)
 
   const handleSeparatorDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     const dock = dockRef.current
@@ -120,6 +127,33 @@ export function ViewerDock({ children }: { children: ReactNode }) {
       useToastStore.getState().show('贴图已应用到 shader/Texture', 'info')
     } catch {
       useToastStore.getState().show('贴图加载失败', 'error')
+    }
+  }
+
+  const handleHdr = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    if (!(await looksLikeHdr(file))) {
+      useToastStore.getState().show('文件不是有效的 Radiance HDR', 'error')
+      return
+    }
+
+    const hdrNode = nodes.find((node) => node.type === 'texture/HDR')
+    if (!hdrNode) {
+      useToastStore.getState().show('请先添加 texture/HDR 节点', 'error')
+      return
+    }
+
+    const assetIndex = hdrNode.widgets.findIndex((widget) => widget.name === 'assetId')
+    const assetId = `hdr-${Date.now()}`
+    try {
+      await loadHdrTexture(assetId, file)
+      if (assetIndex >= 0) setWidgetValue(hdrNode.id, assetIndex, assetId)
+      useToastStore.getState().show('HDR 环境贴图已应用到 texture/HDR', 'info')
+    } catch {
+      useToastStore.getState().show('HDR 贴图加载失败', 'error')
     }
   }
 
@@ -193,6 +227,13 @@ export function ViewerDock({ children }: { children: ReactNode }) {
             >
               贴图
             </button>
+            <button
+              type="button"
+              title="上传 HDR 到 texture/HDR 节点"
+              onClick={() => hdrRef.current?.click()}
+            >
+              HDR
+            </button>
           </div>
           <label className="viewer-perf-toggle" title="持续渲染并采样帧统计">
             <input
@@ -218,6 +259,13 @@ export function ViewerDock({ children }: { children: ReactNode }) {
             onChange={handleFile}
           />
           <input ref={textureRef} type="file" accept="image/*" hidden onChange={handleTexture} />
+          <input
+            ref={hdrRef}
+            type="file"
+            accept=".hdr,image/vnd.radiance"
+            hidden
+            onChange={handleHdr}
+          />
         </div>
         <Viewport3D />
       </div>

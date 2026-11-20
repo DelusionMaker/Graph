@@ -8,7 +8,9 @@
  * UV 使用独立的 `vShaderUv`，避免与 three 在 USE_UV 条件下声明的 `vUv` 重复定义。
  */
 
+import type { EnvironmentEmit } from '../emitters'
 import { PBR_BRDF_FUNCTIONS } from './brdf'
+import { environmentClassicIbl, environmentFunctions, environmentPbrIbl } from './environment'
 import {
   LIGHT_UNIFORMS,
   PI_CONSTANT,
@@ -34,6 +36,7 @@ export interface SurfaceExpressions {
   /** 仅 Blinn-Phong 使用；缺省值保证老工作流仍可编译 */
   shininess?: string
   specularStrength?: string
+  environment?: EnvironmentEmit
 }
 
 export const UNLIT_VERTEX = `
@@ -161,6 +164,7 @@ ${SHADOW_LIGHT_INDEX_UNIFORM}
 
 ${PI_CONSTANT}
 
+${environmentFunctions()}
 ${shadowFactorFunction(shadowMethod)}
 ${PBR_BRDF_FUNCTIONS}
 
@@ -185,6 +189,7 @@ ${SHADOW_PER_LIGHT_SELECTION}
   color += evaluateLight0(N, V, baseColor, roughness, metalness, F0, shadow0);
   color += evaluateLight1(N, V, baseColor, roughness, metalness, F0, shadow1);
   color += evaluateLight2(N, V, baseColor, roughness, metalness, F0, shadow2);
+${surface.environment ? environmentPbrIbl(surface.environment) : ''}
   color += emissive;
 
   gl_FragColor = vec4(color, 1.0);
@@ -213,6 +218,7 @@ ${SHADOW_LIGHT_INDEX_UNIFORM}
 
 ${PI_CONSTANT}
 
+${environmentFunctions()}
 ${shadowFactorFunction(shadowMethod)}
 ${classicLightFunctions(model)}
 
@@ -232,6 +238,7 @@ ${SHADOW_PER_LIGHT_SELECTION}
   color += evaluateLight0(N, V, baseColor, shininess, specularStrength, shadow0);
   color += evaluateLight1(N, V, baseColor, shininess, specularStrength, shadow1);
   color += evaluateLight2(N, V, baseColor, shininess, specularStrength, shadow2);
+${surface.environment ? environmentClassicIbl(surface.environment) : ''}
   color += emissive;
 
   gl_FragColor = vec4(color, 1.0);

@@ -6,6 +6,7 @@ describe('isValidTypePair', () => {
     expect(isValidTypePair('FLOAT', 'FLOAT')).toBe(true)
     expect(isValidTypePair('GEOMETRY', 'GEOMETRY')).toBe(true)
     expect(isValidTypePair('POSTFX', 'POSTFX')).toBe(true)
+    expect(isValidTypePair('HDRI', 'HDRI')).toBe(true)
   })
 
   it('通配符任意方向可连接', () => {
@@ -37,6 +38,7 @@ describe('isValidTypePair', () => {
     expect(isValidTypePair('POSTFX', 'COLOR')).toBe(false)
     expect(isValidTypePair('GEOMETRY', 'MATERIAL')).toBe(false)
     expect(isValidTypePair('MATERIAL', 'POSTFX')).toBe(false)
+    expect(isValidTypePair('HDRI', 'MATERIAL')).toBe(false)
   })
 
   it('未知类型与不相干类型不匹配', () => {

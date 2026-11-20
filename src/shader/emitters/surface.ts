@@ -46,6 +46,8 @@ export function emitSurface(ctx: EmitContext): EmitResult {
   const roughnessInput = ctx.input('roughness')
   const metalnessInput = ctx.input('metalness')
   const emissiveInput = ctx.input('emissive')
+  const environmentInput = ctx.input('environment')
+  const environment = environmentInput?.environment
 
   // 有连线时以上游为准，未连线时使用节点上的兜底常量
   const color = colorInput
@@ -77,6 +79,7 @@ export function emitSurface(ctx: EmitContext): EmitResult {
       emissive,
       shininess,
       specularStrength,
+      environment,
     },
   }
 }

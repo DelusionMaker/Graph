@@ -60,6 +60,7 @@ function buildWorkflow(options = {}) {
         { name: 'roughness', type: 'FLOAT', link: 3 },
         { name: 'metalness', type: 'FLOAT', link: null },
         { name: 'emissive', type: 'COLOR', link: null },
+        { name: 'environment', type: 'HDRI', link: null },
       ],
       [{ name: 'material', type: 'MATERIAL', links: [4] }],
       ['pbr'],
@@ -478,6 +479,39 @@ check(
   'A7 SSR 无 shader 编译错误',
   ssrShaderErrors.length === 0 && pageErrors.length === 0,
   [...ssrShaderErrors, ...pageErrors].join(' | ') || '0',
+)
+
+// HDR 环境贴图节点接入 Surface.environment
+await importWorkflow(
+  buildWorkflow({
+    extraNodes: [
+      makeNode(
+        25,
+        'texture/HDR',
+        [40, 620],
+        [210, 140],
+        [],
+        [{ name: 'environment', type: 'HDRI', links: [80] }],
+        ['hdr-e2e', 1.2, 0],
+      ),
+    ],
+    extraLinks: [[80, 25, 0, 4, 4, 'HDRI']],
+  }),
+)
+await page.waitForTimeout(700)
+state = await programState()
+const hdrShaderErrors = consoleErrors.filter((message) =>
+  /WebGLProgram|Shader Error|shader compilation/i.test(message),
+)
+check(
+  'A7 HDR 环境贴图编译生效',
+  state.status === 'ready' && state.uniforms.u_25_intensity?.value === 1.2,
+  `${state.status} / ${state.uniforms.u_25_intensity?.value}`,
+)
+check(
+  'A7 HDR 环境贴图无 shader 编译错误',
+  hdrShaderErrors.length === 0 && pageErrors.length === 0,
+  [...hdrShaderErrors, ...pageErrors].join(' | ') || '0',
 )
 
 await importWorkflow(buildWorkflow({ postfx: ['Bloom', 'Vignette'] }))

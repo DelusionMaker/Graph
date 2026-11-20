@@ -88,6 +88,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       { name: 'roughness', type: 'FLOAT' },
       { name: 'metalness', type: 'FLOAT' },
       { name: 'emissive', type: 'COLOR' },
+      { name: 'environment', type: 'HDRI' },
     ],
     outputs: [{ name: 'material', type: 'MATERIAL' }],
     widgets: [
@@ -266,6 +267,22 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     ],
     codeAffectingWidgets: ['assetId', 'wrap', 'flipY'],
     width: 200,
+  },
+  {
+    type: 'texture/HDR',
+    title: 'HDR Environment',
+    category: '材质',
+    description: '加载 .hdr 环境贴图，为材质提供近似 IBL',
+    inputs: [],
+    outputs: [{ name: 'environment', type: 'HDRI' }],
+    widgets: [
+      { name: 'assetId', kind: 'text', value: '' },
+      { name: 'intensity', kind: 'slider', value: 1, min: 0, max: 4, step: 0.05 },
+      { name: 'rotation', kind: 'slider', value: 0, min: -3.14, max: 3.14, step: 0.01 },
+    ],
+    // 切换贴图会换绑 sampler，必须参与结构签名
+    codeAffectingWidgets: ['assetId'],
+    width: 210,
   },
   {
     type: 'shader/Math',

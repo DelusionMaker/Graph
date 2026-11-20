@@ -361,4 +361,38 @@ describe('compileWorkflow', () => {
     )
     expect(() => compileWorkflow(workflow)).toThrowError(/assetId/)
   })
+
+  it('HDR 节点为 Surface 提供环境贴图并生成 IBL', () => {
+    const workflow = makeWorkflow(
+      [
+        makeNode(1, 'texture/HDR', ['hdr-1', 1.5, 0.4]),
+        makeNode(2, 'scene/Root'),
+        makeNode(3, 'material/Surface', ['pbr']),
+      ],
+      [
+        [1, 1, 0, 3, 4, 'HDRI'],
+        [2, 3, 0, 2, 1, 'MATERIAL'],
+      ],
+    )
+
+    const program = compileWorkflow(workflow)
+    const slot = program.textureSlots.find((item) => item.uniform === 'u_1_hdr')
+
+    expect(slot?.assetId).toBe('hdr-1')
+    expect(slot?.wrap).toBe('clamp')
+    expect(slot?.flipY).toBe(true)
+    expect(program.uniforms.u_1_intensity.value).toBe(1.5)
+    expect(program.uniforms.u_1_rotation.value).toBe(0.4)
+    expect(program.pbr?.fragmentShader).toContain('u_1_hdr')
+    expect(program.pbr?.fragmentShader).toContain('envDirectionToUv')
+    expect(program.pbr?.fragmentShader).toContain('u_1_intensity')
+
+    const changed: WorkflowUI = {
+      ...workflow,
+      nodes: workflow.nodes.map((node) =>
+        node.id === 1 ? { ...node, widgets_values: ['hdr-2', 1.5, 0.4] } : node,
+      ),
+    }
+    expect(computeSignature(changed)).not.toBe(program.hash)
+  })
 })

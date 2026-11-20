@@ -1,6 +1,6 @@
 # 单一场景光照与阴影算法切换方案
 
-> 文档状态：v1.1（阶段 0–4、阴影工程质量项与屏幕空间反射 SSR 已落地）  
+> 文档状态：v1.2（阶段 0–4、阴影工程质量项、SSR 与 HDR 环境贴图已落地）  
 > 日期：2026-11-20  
 > 适用范围：`单一场景内切换不同光照 / 阴影 / 后处理算法`  
 > 当前状态：WebGL/GLSL 主链路已实现并通过单元 / E2E 验证；真正的 WebGPU path tracing 需要重写渲染器，仍属于独立 Spike。
@@ -18,9 +18,10 @@
 | 阶段 4 | 自定义 SSAO Effect、NormalPass / Depth 接入、深度双边权重与 WebGL2 检测 | 已完成 | `verify:3d` shader 与链验证 |
 | 阴影工程 | `ShadowPassScheduler` / RenderTarget 工具、动态光源相机、normalBias | 已完成 | compiler 单测，`verify:3d` |
 | 阶段 5a | 屏幕空间反射 SSR（深度 / 法线光线步进 Effect） | 已完成 | `verify:3d` shader 与链验证 |
+| HDR 环境 | `texture/HDR` 节点、RGBELoader、HDRI 端口、Surface 近似 IBL | 已完成 | compiler / validate 单测，`verify:3d` |
 | 阶段 5b | WebGPU path tracing（BVH / accumulation / denoiser） | 未开始 | 需重写渲染器，独立 Spike |
 
-当前验证基线：`npm test` 57/57，`npm run build` 通过，`npm run verify:3d` 47/47。
+当前验证基线：`npm test` 58/58，`npm run build` 通过，`npm run verify:3d` 49/49。
 
 ---
 
@@ -550,12 +551,12 @@ src/viewer/passes/
 
 ## 12. 下一步建议
 
-阶段 0–4、阴影工程质量项、SSR 已完成。当前 WebGL/GLSL 架构内剩余工作建议：
+阶段 0–4、阴影工程质量项、SSR 与 HDR 环境贴图已完成。当前 WebGL/GLSL 架构内剩余工作建议：
 
 1. 阴影：多方向光分别投影、点光 cubemap 阴影、VSM blur / light bleeding 参数化。
 2. SSAO：独立双边模糊 Pass、半分辨率、时域降噪。
 3. SSR：屏幕外回退、时序稳定性、粗糙度模糊。
-4. PBR 完整化：IBL、法线贴图、AO / roughness / metalness 贴图、tone mapping。
+4. PBR 完整化：PMREM 预卷积 IBL、法线贴图、AO / roughness / metalness 贴图、tone mapping。
 5. WebGPU path tracing：需要独立 Spike，重写渲染器与 shader 语言（BVH、accumulation、denoiser）。
 
 当前主链路已完成，后续均为独立增强项，可按收益和性能预算逐项推进。

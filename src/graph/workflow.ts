@@ -19,6 +19,7 @@ export const PORT_TYPES = [
   // 资源与终端类型
   'GEOMETRY',
   'MATERIAL',
+  'HDRI',
   'POSTFX',
   // 光照节点（自定义 shader，不经过 three 的 Light）
   'LIGHT',

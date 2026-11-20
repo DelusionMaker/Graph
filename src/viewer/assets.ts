@@ -1,6 +1,8 @@
 import {
   ClampToEdgeWrapping,
   DataTexture,
+  EquirectangularReflectionMapping,
+  LinearFilter,
   MirroredRepeatWrapping,
   RepeatWrapping,
   SRGBColorSpace,
@@ -10,6 +12,7 @@ import {
   type Object3D,
   type Texture,
 } from 'three'
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
 
 /** 本模块创建、需要显式回收的 blob URL */
 const modelUrls = new Set<string>()
@@ -113,6 +116,33 @@ export function loadTexture(
       (error) => {
         URL.revokeObjectURL(url)
         reject(error instanceof Error ? error : new Error('纹理加载失败'))
+      },
+    )
+  })
+}
+
+/** 从本地 .hdr 文件加载等距柱状环境贴图并注册到 assetId */
+export function loadHdrTexture(id: string, file: File): Promise<Texture> {
+  const url = URL.createObjectURL(file)
+  return new Promise((resolve, reject) => {
+    new RGBELoader().load(
+      url,
+      (texture) => {
+        texture.mapping = EquirectangularReflectionMapping
+        texture.minFilter = LinearFilter
+        texture.magFilter = LinearFilter
+        texture.generateMipmaps = false
+        texture.wrapS = ClampToEdgeWrapping
+        texture.wrapT = ClampToEdgeWrapping
+        texture.needsUpdate = true
+        registerTexture(id, texture)
+        URL.revokeObjectURL(url)
+        resolve(texture)
+      },
+      undefined,
+      (error) => {
+        URL.revokeObjectURL(url)
+        reject(error instanceof Error ? error : new Error('HDR 贴图加载失败'))
       },
     )
   })
