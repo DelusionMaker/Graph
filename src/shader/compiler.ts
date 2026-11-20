@@ -20,6 +20,7 @@ import {
   pbrFragment,
   unlitFragment,
 } from './glsl/chunks'
+import { DEFAULT_SHADOW_METHOD, type ShadowMethod } from './glsl/shadow'
 import { computeSignature } from './signature'
 
 export type MeshShape = 'box' | 'sphere' | 'torusknot' | 'gltf'
@@ -58,6 +59,14 @@ export interface ShadowSettings {
   mapSize: 1024 | 2048
   bias: number
   softness: number
+  /** 会改变 GLSL 结构，参与编译签名 */
+  method: ShadowMethod
+  /** PCSS 面积光半径，按 shadow map texel 计 */
+  lightSize: number
+  /** PCSS blocker 搜索采样数上限 16 */
+  blockerSamples: number
+  /** PCSS / PCF 可变半径采样数上限 32 */
+  pcfSamples: number
 }
 
 export interface LightingSettings {
@@ -283,12 +292,24 @@ function readShadow(
     return null
   }
 
+  const methodValue = String(readWidgetValue(node, 'method') ?? DEFAULT_SHADOW_METHOD)
+
   return {
     mapSize: Number(readWidgetValue(node, 'mapSize')) === 2048 ? 2048 : 1024,
     bias: readNumber(readWidgetValue(node, 'bias'), 0.0015),
     softness: Math.max(
       1,
       Math.min(4, Math.round(readNumber(readWidgetValue(node, 'softness'), 1))),
+    ),
+    method: methodValue === 'pcss' ? 'pcss' : DEFAULT_SHADOW_METHOD,
+    lightSize: Math.max(1, Math.min(16, readNumber(readWidgetValue(node, 'lightSize'), 6))),
+    blockerSamples: Math.max(
+      4,
+      Math.min(16, Math.round(readNumber(readWidgetValue(node, 'blockerSamples'), 8))),
+    ),
+    pcfSamples: Math.max(
+      4,
+      Math.min(32, Math.round(readNumber(readWidgetValue(node, 'pcfSamples'), 16))),
     ),
   }
 }
@@ -379,20 +400,32 @@ export function compileWorkflow(workflow: WorkflowUI): CompiledProgram {
     }
   }
 
+  const shadowSettings = readShadow(activeRoot, linkByTarget, nodeById, warnings)
+  const shadowMethod = shadowSettings?.method ?? DEFAULT_SHADOW_METHOD
+
   const shading = surface?.shading ?? 'pbr'
   const pbr =
     surface && shading === 'pbr'
-      ? { vertexShader: PBR_VERTEX, fragmentShader: pbrFragment(declarations, surface) }
+      ? {
+          vertexShader: PBR_VERTEX,
+          fragmentShader: pbrFragment(declarations, surface, shadowMethod),
+        }
       : null
 
   const lambert =
     surface && shading === 'lambert'
-      ? { vertexShader: PBR_VERTEX, fragmentShader: lambertFragment(declarations, surface) }
+      ? {
+          vertexShader: PBR_VERTEX,
+          fragmentShader: lambertFragment(declarations, surface, shadowMethod),
+        }
       : null
 
   const blinnPhong =
     surface && shading === 'blinnPhong'
-      ? { vertexShader: PBR_VERTEX, fragmentShader: blinnPhongFragment(declarations, surface) }
+      ? {
+          vertexShader: PBR_VERTEX,
+          fragmentShader: blinnPhongFragment(declarations, surface, shadowMethod),
+        }
       : null
 
   const unlit =
@@ -414,7 +447,7 @@ export function compileWorkflow(workflow: WorkflowUI): CompiledProgram {
     textureSlots,
     lighting: {
       lights: readLights(activeRoot, linkByTarget, nodeById, warnings),
-      shadow: readShadow(activeRoot, linkByTarget, nodeById, warnings),
+      shadow: shadowSettings,
     },
     postfxChain: collectPostFXChain(workflow, activeOutput?.id ?? null),
     shading,

@@ -79,6 +79,33 @@ describe('computeSignature', () => {
     expect(computeSignature(changed)).not.toBe(computeSignature(baseGraph()))
   })
 
+  it('阴影方法变化会改变签名，采样参数变化不会', () => {
+    const graph = makeWorkflow(
+      [
+        makeNode(1, 'render/Shadow', ['1024', 0.001, 1, 'pcf', 6, 8, 16]),
+        makeNode(2, 'scene/Root'),
+      ],
+      [[1, 1, 0, 2, 3, 'SHADOW']],
+    )
+    const methodChanged = makeWorkflow(
+      [
+        makeNode(1, 'render/Shadow', ['1024', 0.001, 1, 'pcss', 6, 8, 16]),
+        makeNode(2, 'scene/Root'),
+      ],
+      [[1, 1, 0, 2, 3, 'SHADOW']],
+    )
+    const paramsChanged = makeWorkflow(
+      [
+        makeNode(1, 'render/Shadow', ['1024', 0.001, 1, 'pcf', 10, 12, 24]),
+        makeNode(2, 'scene/Root'),
+      ],
+      [[1, 1, 0, 2, 3, 'SHADOW']],
+    )
+
+    expect(computeSignature(methodChanged)).not.toBe(computeSignature(graph))
+    expect(computeSignature(paramsChanged)).toBe(computeSignature(graph))
+  })
+
   it('Mesh shape 变化会改变签名', () => {
     const changed = baseGraph()
     changed.nodes[0].widgets_values = ['sphere', '', 1]

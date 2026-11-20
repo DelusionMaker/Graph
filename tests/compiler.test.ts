@@ -233,7 +233,7 @@ describe('compileWorkflow', () => {
         makeNode(1, 'render/AmbientLight', ['#ffffff', 0.3]),
         makeNode(2, 'render/DirectionalLight', ['#ff0000', 5, 1, -1, 0]),
         makeNode(3, 'render/LightRig'),
-        makeNode(4, 'render/Shadow', ['2048', 0.001, 2]),
+        makeNode(4, 'render/Shadow', ['2048', 0.001, 2, 'pcss', 6, 12, 24]),
         makeNode(5, 'scene/Root'),
         makeNode(6, 'material/Surface', ['pbr']),
       ],
@@ -255,6 +255,11 @@ describe('compileWorkflow', () => {
     expect(program.lighting.lights[1].direction[1]).toBeCloseTo(-0.707, 2)
     expect(program.lighting.shadow?.mapSize).toBe(2048)
     expect(program.lighting.shadow?.softness).toBe(2)
+    expect(program.lighting.shadow?.method).toBe('pcss')
+    expect(program.lighting.shadow?.lightSize).toBe(6)
+    expect(program.lighting.shadow?.blockerSamples).toBe(12)
+    expect(program.lighting.shadow?.pcfSamples).toBe(24)
+    expect(program.pbr?.fragmentShader).toContain('SHADOW_MAX_BLOCKER_SAMPLES')
   })
 
   it('未连接阴影节点时没有阴影', () => {

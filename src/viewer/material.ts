@@ -95,6 +95,9 @@ function buildShadowUniforms(program: CompiledProgram): Record<string, IUniform>
     u_shadowTexel: { value: 1 / (shadow?.mapSize ?? 1024) },
     u_shadowSoftness: { value: shadow?.softness ?? 1 },
     u_shadowEnabled: { value: shadow && directional ? 1 : 0 },
+    u_shadowLightSize: { value: shadow?.lightSize ?? 6 },
+    u_shadowBlockerSamples: { value: shadow?.blockerSamples ?? 8 },
+    u_shadowPcfSamples: { value: shadow?.pcfSamples ?? 16 },
     // 只让对应的那一盏灯接收阴影；没有投影灯时为 -1
     u_shadowLightIndex: { value: shadow && directional ? directionalIndex : -1 },
   }

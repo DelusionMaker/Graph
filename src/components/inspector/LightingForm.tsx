@@ -5,6 +5,10 @@ import { Widget } from '../Widget'
 export function LightingForm({ node }: { node: NodeSnapshot }) {
   const title =
     node.type === 'render/LightRig' ? '灯光组' : node.type === 'render/Shadow' ? '阴影' : '光照'
+  const shadowMethod = String(
+    node.widgets.find((widget) => widget.name === 'method')?.value ?? 'pcf',
+  )
+  const pcssOnly = new Set(['lightSize', 'blockerSamples', 'pcfSamples'])
 
   return (
     <section>
@@ -14,7 +18,14 @@ export function LightingForm({ node }: { node: NodeSnapshot }) {
           {node.type === 'render/LightRig' ? '把最多 3 盏灯连接到灯光组' : '此节点没有可调参数'}
         </p>
       ) : (
-        node.widgets.map((widget) => <Widget key={widget.index} nodeId={node.id} widget={widget} />)
+        node.widgets
+          .filter(
+            (widget) =>
+              node.type !== 'render/Shadow' ||
+              shadowMethod === 'pcss' ||
+              !pcssOnly.has(widget.name),
+          )
+          .map((widget) => <Widget key={widget.index} nodeId={node.id} widget={widget} />)
       )}
       {node.type === 'render/LightRig' ? (
         <p className="inspector-note">灯光组输出到 Scene Root 的 lights 输入</p>

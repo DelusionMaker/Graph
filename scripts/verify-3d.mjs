@@ -111,7 +111,7 @@ function buildWorkflow(options = {}) {
       [200, 150],
       [],
       [{ name: 'shadow', type: 'SHADOW', links: [12] }],
-      ['1024', 0.0015, 2],
+      ['1024', 0.0015, 2, 'pcf', 6, 8, 16],
     ),
   ]
   const links = [
@@ -395,6 +395,29 @@ check(
   'A6 光照节点数量正确',
   state.lighting?.lights?.length === 2,
   String(state.lighting?.lights?.length),
+)
+
+// PCSS 方法变化应重编译；采样参数变化只刷新 uniform
+const hashBeforeShadowMethod = state.hash
+await editWidget(9, 'method', 'pcss')
+state = await programState()
+check(
+  'A6 阴影方法切换为 PCSS',
+  state.lighting?.shadow?.method === 'pcss',
+  String(state.lighting?.shadow?.method),
+)
+check(
+  'A6 阴影方法变化触发重编译',
+  state.hash !== hashBeforeShadowMethod,
+  `${hashBeforeShadowMethod} → ${state.hash}`,
+)
+const hashAfterPcssMethod = state.hash
+await editWidget(9, 'lightSize', 8)
+state = await programState()
+check(
+  'A6 PCSS 参数写入并只刷新 uniform',
+  state.lighting?.shadow?.lightSize === 8 && state.hash === hashAfterPcssMethod,
+  `lightSize=${state.lighting?.shadow?.lightSize}, hash=${state.hash}`,
 )
 
 // ---------- A7/A8 后处理链 ----------

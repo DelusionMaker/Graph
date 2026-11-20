@@ -12,7 +12,8 @@ import {
   type Material as ThreeMaterial,
 } from 'three'
 import type { CompiledProgram } from '../shader/compiler'
-import { GROUND_FRAGMENT, GROUND_VERTEX } from '../shader/glsl/chunks'
+import { GROUND_VERTEX, groundFragment } from '../shader/glsl/chunks'
+import { DEFAULT_SHADOW_METHOD, type ShadowMethod } from '../shader/glsl/shadow'
 import { useProgramStore } from '../shader/useProgramStore'
 import { resolveTexture } from './assets'
 import { ModelAsset } from './ModelAsset'
@@ -20,10 +21,10 @@ import { createProgramMaterial, syncMaterial } from './material'
 import { useRequestFrame } from './requestFrame'
 import { useViewerStore } from './useViewerStore'
 
-function createGroundMaterial(): ShaderMaterial {
+function createGroundMaterial(method: ShadowMethod): ShaderMaterial {
   return new ShaderMaterial({
     vertexShader: GROUND_VERTEX,
-    fragmentShader: GROUND_FRAGMENT,
+    fragmentShader: groundFragment(method),
     uniforms: {
       u_shadowMap: { value: resolveTexture('') },
       u_lightViewProjection: { value: new Matrix4() },
@@ -32,6 +33,9 @@ function createGroundMaterial(): ShaderMaterial {
       u_shadowTexel: { value: 1 / 1024 },
       u_shadowSoftness: { value: 1 },
       u_shadowEnabled: { value: 0 },
+      u_shadowLightSize: { value: 6 },
+      u_shadowBlockerSamples: { value: 8 },
+      u_shadowPcfSamples: { value: 16 },
     },
   })
 }
@@ -71,6 +75,7 @@ function useShadowPass(
       geometryKey,
       shadow !== null,
       shadow?.mapSize,
+      shadow?.method ?? DEFAULT_SHADOW_METHOD,
       ...directional.direction,
     ].join('|')
     if (lastKey.current === key) return
@@ -152,8 +157,9 @@ export function SceneRoot() {
   programRef.current = program
 
   const shading = program?.shading ?? 'pbr'
+  const shadowMethod = program?.lighting.shadow?.method ?? DEFAULT_SHADOW_METHOD
   const material = useMemo(() => createProgramMaterial(programRef.current), [shading])
-  const groundMaterial = useMemo(() => createGroundMaterial(), [])
+  const groundMaterial = useMemo(() => createGroundMaterial(shadowMethod), [shadowMethod])
   const requestFrame = useRequestFrame()
 
   useEffect(() => {
@@ -170,6 +176,9 @@ export function SceneRoot() {
     uniforms.u_shadowBias.value = shadow?.bias ?? 0.0015
     uniforms.u_shadowTexel.value = 1 / (shadow?.mapSize ?? 1024)
     uniforms.u_shadowSoftness.value = shadow?.softness ?? 1
+    uniforms.u_shadowLightSize.value = shadow?.lightSize ?? 6
+    uniforms.u_shadowBlockerSamples.value = shadow?.blockerSamples ?? 8
+    uniforms.u_shadowPcfSamples.value = shadow?.pcfSamples ?? 16
     requestFrame()
   }, [program, groundMaterial, requestFrame])
 

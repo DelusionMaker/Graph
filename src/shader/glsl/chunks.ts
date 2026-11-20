@@ -16,10 +16,11 @@ import {
   type ClassicShadingModel,
 } from './lighting'
 import {
-  SHADOW_FACTOR_FUNCTION,
   SHADOW_LIGHT_INDEX_UNIFORM,
   SHADOW_PER_LIGHT_SELECTION,
   SHADOW_SAMPLING_UNIFORMS,
+  shadowFactorFunction,
+  type ShadowMethod,
 } from './shadow'
 
 export const SHADER_UV_VARYING = 'varying vec2 vShaderUv;'
@@ -67,12 +68,13 @@ void main() {
 }
 `
 
-export const GROUND_FRAGMENT = `
+export function groundFragment(method: ShadowMethod): string {
+  return `
 ${SHADOW_SAMPLING_UNIFORMS}
 
 varying vec3 vWorldPosition;
 
-${SHADOW_FACTOR_FUNCTION}
+${shadowFactorFunction(method)}
 
 void main() {
   float shadow = shadowFactor(vWorldPosition, vec3(0.0, 1.0, 0.0));
@@ -80,6 +82,7 @@ void main() {
   gl_FragColor = vec4(base * (0.35 + 0.65 * shadow), 1.0);
 }
 `
+}
 
 export const PBR_VERTEX = `
 varying vec2 vShaderUv;
@@ -138,7 +141,11 @@ vec3 evaluateLight${index}(vec3 N, vec3 V, vec3 baseColor, float roughness, floa
 `
 }
 
-export function pbrFragment(declarations: string[], surface: SurfaceExpressions): string {
+export function pbrFragment(
+  declarations: string[],
+  surface: SurfaceExpressions,
+  shadowMethod: ShadowMethod,
+): string {
   return `
 ${declarations.join('\n')}
 
@@ -154,7 +161,7 @@ ${SHADOW_LIGHT_INDEX_UNIFORM}
 
 ${PI_CONSTANT}
 
-${SHADOW_FACTOR_FUNCTION}
+${shadowFactorFunction(shadowMethod)}
 ${PBR_BRDF_FUNCTIONS}
 
 ${pbrLightFunction(0)}
@@ -189,6 +196,7 @@ function classicFragment(
   declarations: string[],
   surface: SurfaceExpressions,
   model: ClassicShadingModel,
+  shadowMethod: ShadowMethod,
 ): string {
   return `
 ${declarations.join('\n')}
@@ -205,7 +213,7 @@ ${SHADOW_LIGHT_INDEX_UNIFORM}
 
 ${PI_CONSTANT}
 
-${SHADOW_FACTOR_FUNCTION}
+${shadowFactorFunction(shadowMethod)}
 ${classicLightFunctions(model)}
 
 void main() {
@@ -231,10 +239,18 @@ ${SHADOW_PER_LIGHT_SELECTION}
 `
 }
 
-export function lambertFragment(declarations: string[], surface: SurfaceExpressions): string {
-  return classicFragment(declarations, surface, 'lambert')
+export function lambertFragment(
+  declarations: string[],
+  surface: SurfaceExpressions,
+  shadowMethod: ShadowMethod,
+): string {
+  return classicFragment(declarations, surface, 'lambert', shadowMethod)
 }
 
-export function blinnPhongFragment(declarations: string[], surface: SurfaceExpressions): string {
-  return classicFragment(declarations, surface, 'blinnPhong')
+export function blinnPhongFragment(
+  declarations: string[],
+  surface: SurfaceExpressions,
+  shadowMethod: ShadowMethod,
+): string {
+  return classicFragment(declarations, surface, 'blinnPhong', shadowMethod)
 }
