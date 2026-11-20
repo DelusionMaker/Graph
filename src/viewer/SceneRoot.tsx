@@ -1,6 +1,7 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import {
+  Color,
   DepthTexture,
   Matrix4,
   Mesh,
@@ -9,7 +10,10 @@ import {
   ShaderMaterial,
   Vector3,
   WebGLRenderTarget,
+  type Camera,
   type Material as ThreeMaterial,
+  type Scene,
+  type WebGLRenderer,
 } from 'three'
 import type { CompiledProgram } from '../shader/compiler'
 import { GROUND_VERTEX, groundFragment } from '../shader/glsl/chunks'
@@ -18,6 +22,13 @@ import { useProgramStore } from '../shader/useProgramStore'
 import { resolveTexture } from './assets'
 import { ModelAsset } from './ModelAsset'
 import { createProgramMaterial, syncMaterial } from './material'
+import {
+  createVsmResources,
+  createVsmTargets,
+  disposeVsmTargets,
+  renderVsmBlur,
+  supportsVsm,
+} from './passes/vsm'
 import { useRequestFrame } from './requestFrame'
 import { useViewerStore } from './useViewerStore'
 
@@ -27,6 +38,8 @@ function createGroundMaterial(method: ShadowMethod): ShaderMaterial {
     fragmentShader: groundFragment(method),
     uniforms: {
       u_shadowMap: { value: resolveTexture('') },
+      u_shadowMoments: { value: resolveTexture('') },
+      u_shadowUseVsm: { value: 0 },
       u_lightViewProjection: { value: new Matrix4() },
       u_shadowLightDir: { value: new Vector3(0, -1, 0) },
       u_shadowBias: { value: 0.0015 },
@@ -37,6 +50,51 @@ function createGroundMaterial(method: ShadowMethod): ShaderMaterial {
       u_shadowBlockerSamples: { value: 8 },
       u_shadowPcfSamples: { value: 16 },
     },
+  })
+}
+
+function renderSceneWithShadowMaterial(
+  gl: WebGLRenderer,
+  scene: Scene,
+  camera: Camera,
+  target: WebGLRenderTarget,
+  material: ThreeMaterial,
+  clearWhite = false,
+): void {
+  const originals = new Map<Mesh, ThreeMaterial | ThreeMaterial[]>()
+  const hiddenReceivers = new Map<Mesh, boolean>()
+
+  scene.traverse((object) => {
+    const mesh = object as Mesh
+    if (!mesh.isMesh) return
+    if (mesh.userData.isShadowReceiver) {
+      hiddenReceivers.set(mesh, mesh.visible)
+      mesh.visible = false
+      return
+    }
+    originals.set(mesh, mesh.material)
+    mesh.material = material
+  })
+
+  const previousBackground = scene.background
+  const previousClearColor = new Color()
+  gl.getClearColor(previousClearColor)
+  const previousClearAlpha = gl.getClearAlpha()
+
+  scene.background = null
+  if (clearWhite) gl.setClearColor(0xffffff, 1)
+  gl.setRenderTarget(target)
+  gl.clear()
+  gl.render(scene, camera)
+  gl.setRenderTarget(null)
+  scene.background = previousBackground
+  gl.setClearColor(previousClearColor, previousClearAlpha)
+
+  originals.forEach((original, mesh) => {
+    mesh.material = original
+  })
+  hiddenReceivers.forEach((visible, mesh) => {
+    mesh.visible = visible
   })
 }
 
@@ -55,16 +113,28 @@ function useShadowPass(
   const scene = useThree((state) => state.scene)
   const shadow = program?.lighting.shadow
   const directional = program?.lighting.lights.find((light) => light.type === 'directional')
+  const vsmSupported = useMemo(
+    () => (shadow?.method === 'vsm' ? supportsVsm(gl) : false),
+    [gl, shadow?.method],
+  )
+  const useVsm = shadow?.method === 'vsm' && vsmSupported
+  const hasShadow = shadow !== null
+  const mapSize = shadow?.mapSize ?? 1024
+  const hasDirectional = Boolean(directional)
 
   const target = useMemo(() => {
-    if (!shadow || !directional) return null
-    const size = shadow.mapSize
-    const renderTarget = new WebGLRenderTarget(size, size)
-    renderTarget.depthTexture = new DepthTexture(size, size)
+    if (!hasShadow || !hasDirectional) return null
+    const renderTarget = new WebGLRenderTarget(mapSize, mapSize)
+    renderTarget.depthTexture = new DepthTexture(mapSize, mapSize)
     return renderTarget
-  }, [shadow !== null, shadow?.mapSize, Boolean(directional)])
+  }, [hasShadow, mapSize, hasDirectional])
+
+  const vsmTargets = useMemo(() => (useVsm ? createVsmTargets(mapSize) : null), [useVsm, mapSize])
+  const vsmResources = useMemo(() => (useVsm ? createVsmResources() : null), [useVsm])
 
   useEffect(() => () => target?.dispose(), [target])
+  useEffect(() => () => disposeVsmTargets(vsmTargets), [vsmTargets])
+  useEffect(() => () => vsmResources?.dispose(), [vsmResources])
 
   const lastKey = useRef('')
 
@@ -76,6 +146,7 @@ function useShadowPass(
       shadow !== null,
       shadow?.mapSize,
       shadow?.method ?? DEFAULT_SHADOW_METHOD,
+      useVsm,
       ...directional.direction,
     ].join('|')
     if (lastKey.current === key) return
@@ -89,38 +160,24 @@ function useShadowPass(
     lightCamera.updateMatrixWorld()
     lightCamera.updateProjectionMatrix()
 
-    // 投射 mesh 临时换成深度材质；接收阴影的地面必须完全移出这次渲染：
-    // 它采样着 target.depthTexture，若留在场景里会造成 framebuffer ↔ texture feedback loop
+    // 深度图始终渲染：VSM 设备不支持时可直接回退 PCF
     const depthMaterial = new MeshDepthMaterial()
-    const originals = new Map<Mesh, ThreeMaterial | ThreeMaterial[]>()
-    const hiddenReceivers = new Map<Mesh, boolean>()
-    scene.traverse((object) => {
-      const mesh = object as Mesh
-      if (!mesh.isMesh) return
-      if (mesh.userData.isShadowReceiver) {
-        hiddenReceivers.set(mesh, mesh.visible)
-        mesh.visible = false
-        return
-      }
-      originals.set(mesh, mesh.material)
-      mesh.material = depthMaterial
-    })
-
-    const previousBackground = scene.background
-    scene.background = null
-    gl.setRenderTarget(target)
-    gl.clear()
-    gl.render(scene, lightCamera)
-    gl.setRenderTarget(null)
-    scene.background = previousBackground
-
-    originals.forEach((original, mesh) => {
-      mesh.material = original
-    })
-    hiddenReceivers.forEach((visible, mesh) => {
-      mesh.visible = visible
-    })
+    renderSceneWithShadowMaterial(gl, scene, lightCamera, target, depthMaterial)
     depthMaterial.dispose()
+
+    if (useVsm && vsmTargets && vsmResources) {
+      const mapSize = shadow?.mapSize ?? 1024
+      renderSceneWithShadowMaterial(
+        gl,
+        scene,
+        lightCamera,
+        vsmTargets.moment,
+        vsmResources.momentMaterial,
+        true,
+      )
+      renderVsmBlur(gl, vsmResources, vsmTargets.moment.texture, vsmTargets.blur, [1 / mapSize, 0])
+      renderVsmBlur(gl, vsmResources, vsmTargets.blur.texture, vsmTargets.moment, [0, 1 / mapSize])
+    }
 
     const viewProjection = new Matrix4().multiplyMatrices(
       lightCamera.projectionMatrix,
@@ -129,6 +186,10 @@ function useShadowPass(
 
     for (const current of [material, groundMaterial]) {
       if (current.uniforms.u_shadowMap) current.uniforms.u_shadowMap.value = target.depthTexture
+      if (current.uniforms.u_shadowMoments) {
+        current.uniforms.u_shadowMoments.value = vsmTargets?.moment.texture ?? resolveTexture('')
+      }
+      if (current.uniforms.u_shadowUseVsm) current.uniforms.u_shadowUseVsm.value = useVsm ? 1 : 0
       if (current.uniforms.u_lightViewProjection) {
         current.uniforms.u_lightViewProjection.value = viewProjection
       }

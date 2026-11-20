@@ -301,7 +301,7 @@ function readShadow(
       1,
       Math.min(4, Math.round(readNumber(readWidgetValue(node, 'softness'), 1))),
     ),
-    method: methodValue === 'pcss' ? 'pcss' : DEFAULT_SHADOW_METHOD,
+    method: methodValue === 'pcss' || methodValue === 'vsm' ? methodValue : DEFAULT_SHADOW_METHOD,
     lightSize: Math.max(1, Math.min(16, readNumber(readWidgetValue(node, 'lightSize'), 6))),
     blockerSamples: Math.max(
       4,

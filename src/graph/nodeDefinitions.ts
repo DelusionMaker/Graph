@@ -173,7 +173,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     type: 'render/Shadow',
     title: '阴影',
     category: '渲染',
-    description: '方向光阴影（PCF / PCSS）；连接到 Scene Root 即启用',
+    description: '方向光阴影（PCF / PCSS / VSM）；连接到 Scene Root 即启用',
     inputs: [],
     outputs: [{ name: 'shadow', type: 'SHADOW' }],
     widgets: [
@@ -181,7 +181,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       { name: 'bias', kind: 'number', value: 0.0015, step: 0.0005 },
       { name: 'softness', kind: 'slider', value: 1, min: 1, max: 4, step: 1 },
       // 新参数追加在末尾，保证老工作流的 widgets_values 索引不变
-      { name: 'method', kind: 'combo', value: 'pcf', values: ['pcf', 'pcss'] },
+      { name: 'method', kind: 'combo', value: 'pcf', values: ['pcf', 'pcss', 'vsm'] },
       { name: 'lightSize', kind: 'slider', value: 6, min: 1, max: 16, step: 0.5 },
       { name: 'blockerSamples', kind: 'number', value: 8, min: 4, max: 16, step: 1 },
       { name: 'pcfSamples', kind: 'number', value: 16, min: 4, max: 32, step: 1 },

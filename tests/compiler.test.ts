@@ -262,6 +262,27 @@ describe('compileWorkflow', () => {
     expect(program.pbr?.fragmentShader).toContain('SHADOW_MAX_BLOCKER_SAMPLES')
   })
 
+  it('VSM 阴影生成 moments 采样与 PCF 回退分支', () => {
+    const workflow = makeWorkflow(
+      [
+        makeNode(1, 'render/Shadow', ['1024', 0.001, 1, 'vsm', 6, 8, 16]),
+        makeNode(2, 'scene/Root'),
+        makeNode(3, 'material/Surface', ['pbr']),
+      ],
+      [
+        [1, 1, 0, 2, 3, 'SHADOW'],
+        [2, 3, 0, 2, 1, 'MATERIAL'],
+      ],
+    )
+
+    const program = compileWorkflow(workflow)
+    expect(program.lighting.shadow?.method).toBe('vsm')
+    expect(program.pbr?.fragmentShader).toContain('u_shadowMoments')
+    expect(program.pbr?.fragmentShader).toContain('u_shadowUseVsm')
+    expect(program.pbr?.fragmentShader).toContain('vsmShadow')
+    expect(program.pbr?.fragmentShader).toContain('pcfShadow')
+  })
+
   it('未连接阴影节点时没有阴影', () => {
     const workflow = makeWorkflow(
       [makeNode(1, 'render/Shadow', ['2048', 0.001, 2]), makeNode(2, 'scene/Root')],

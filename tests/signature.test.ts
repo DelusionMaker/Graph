@@ -94,6 +94,13 @@ describe('computeSignature', () => {
       ],
       [[1, 1, 0, 2, 3, 'SHADOW']],
     )
+    const vsmChanged = makeWorkflow(
+      [
+        makeNode(1, 'render/Shadow', ['1024', 0.001, 1, 'vsm', 6, 8, 16]),
+        makeNode(2, 'scene/Root'),
+      ],
+      [[1, 1, 0, 2, 3, 'SHADOW']],
+    )
     const paramsChanged = makeWorkflow(
       [
         makeNode(1, 'render/Shadow', ['1024', 0.001, 1, 'pcf', 10, 12, 24]),
@@ -103,6 +110,7 @@ describe('computeSignature', () => {
     )
 
     expect(computeSignature(methodChanged)).not.toBe(computeSignature(graph))
+    expect(computeSignature(vsmChanged)).not.toBe(computeSignature(graph))
     expect(computeSignature(paramsChanged)).toBe(computeSignature(graph))
   })
 

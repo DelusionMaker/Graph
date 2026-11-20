@@ -87,6 +87,8 @@ function buildShadowUniforms(program: CompiledProgram): Record<string, IUniform>
   return {
     // 未渲染 depth pass 时用白色兜底纹理，采样结果 1 = 完全受光
     u_shadowMap: { value: resolveTexture('') },
+    u_shadowMoments: { value: resolveTexture('') },
+    u_shadowUseVsm: { value: 0 },
     u_lightViewProjection: { value: new Matrix4() },
     u_shadowLightDir: {
       value: new Vector3(...(directional?.direction ?? [0, -1, 0])),

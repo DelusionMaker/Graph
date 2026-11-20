@@ -420,6 +420,21 @@ check(
   `lightSize=${state.lighting?.shadow?.lightSize}, hash=${state.hash}`,
 )
 
+const hashAfterPcssParams = state.hash
+await editWidget(9, 'method', 'vsm')
+state = await programState()
+check(
+  'A6 阴影方法切换为 VSM',
+  state.lighting?.shadow?.method === 'vsm',
+  String(state.lighting?.shadow?.method),
+)
+check(
+  'A6 VSM 切换触发重编译',
+  state.hash !== hashAfterPcssParams,
+  `${hashAfterPcssParams} → ${state.hash}`,
+)
+check('A6 VSM 模式无未捕获异常', pageErrors.length === 0, pageErrors.join(' | ') || '0')
+
 // ---------- A7/A8 后处理链 ----------
 await importWorkflow(buildWorkflow())
 check('A7 无 postfx 时链为空', (await programState()).postfx.length === 0)
