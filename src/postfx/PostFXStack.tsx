@@ -1,7 +1,8 @@
-import { Bloom, EffectComposer, SMAA, SSAO, Vignette } from '@react-three/postprocessing'
+import { Bloom, EffectComposer, SMAA, Vignette } from '@react-three/postprocessing'
 import { useMemo, type ReactElement } from 'react'
 import { useProgramStore } from '../shader/useProgramStore'
 import type { PostFXDescriptor } from './chain'
+import { CustomSSAO } from './CustomSSAOEffect'
 
 const EMPTY: PostFXDescriptor[] = []
 
@@ -23,7 +24,7 @@ function renderEffect(item: PostFXDescriptor): ReactElement | null {
       )
     case 'SSAO':
       return (
-        <SSAO
+        <CustomSSAO
           key={item.id}
           samples={numberParam(params.samples, 16)}
           radius={numberParam(params.radius, 0.1)}

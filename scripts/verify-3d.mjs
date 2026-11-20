@@ -446,6 +446,23 @@ check(
   JSON.stringify((await programState()).postfx),
 )
 
+await importWorkflow(buildWorkflow({ postfx: ['SSAO'] }))
+await page.waitForTimeout(700)
+state = await programState()
+check(
+  'A7 自定义 SSAO 链生效',
+  JSON.stringify(state.postfx) === JSON.stringify(['SSAO']),
+  JSON.stringify(state.postfx),
+)
+const ssaoShaderErrors = consoleErrors.filter((message) =>
+  /WebGLProgram|Shader Error|shader compilation/i.test(message),
+)
+check(
+  'A7 自定义 SSAO 无 shader 编译错误',
+  ssaoShaderErrors.length === 0 && pageErrors.length === 0,
+  [...ssaoShaderErrors, ...pageErrors].join(' | ') || '0',
+)
+
 await importWorkflow(buildWorkflow({ postfx: ['Bloom', 'Vignette'] }))
 const chainA = (await programState()).postfx
 await importWorkflow(buildWorkflow({ postfx: ['Vignette', 'Bloom'] }))
